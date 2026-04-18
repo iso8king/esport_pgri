@@ -1,27 +1,11 @@
 <script>
-  import { link, push } from 'svelte-spa-router';
+  import { push } from 'svelte-spa-router';
   import Swal from "sweetalert2";
   let email = '';
   let password = '';
   let showPassword = false;
 
-  const akundummy = [
-    {
-      email: 'admin@email.com',
-      password: 'admin',
-      fullName: 'Admin PGRI',
-      role: 'admin',
-    },
-    {
-      email: 'user@email.com',
-      password: 'user',
-      fullName: 'Pemain',
-      role: 'user',
-    }
-  ];
-  function handleSubmit() {
-    
-    // Validasi Kosong
+  async function handleSubmit() {
     if (!email || !password) {
       Swal.fire({
         icon: 'warning',
@@ -32,33 +16,53 @@
       return;
     }
 
-    const matchedUser = akundummy.find(
-      (akun) => akun.email === email && akun.password === password
-    );
-    if (matchedUser) {
-      localStorage.setItem('user_name', matchedUser.fullName);
-      localStorage.setItem('user_role', matchedUser.role);
+    try {
+      const res = await fetch("http://localhost:9999/api/users/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ username: email, password })
+      });
+
+      if (!res.ok) {
+        throw new Error("Login gagal");
+      }
+
+      const data = await res.json();
+      console.log("Response JSON:", data);
+      console.log(data.data.nama)
+
+
+      // ambil dari data.data
+      localStorage.setItem("user_name", data.data.nama);
+      localStorage.setItem("user_role", data.data.role);
+      localStorage.setItem("username", data.data.username);
+      localStorage.setItem("user_game_id", data.data.game_id);
+      localStorage.setItem("user_server_id", data.data.server_id);
+
 
       Swal.fire({
         icon: 'success',
         title: 'Login Berhasil!',
-        text: `Selamat datang kembali, ${matchedUser.fullName}!`,
+        text: `Selamat datang kembali, ${data.data.nama}!`,
         confirmButtonColor: '#3b82f6',
-        timer: 2000, 
+        timer: 2000,
         showConfirmButton: false
       }).then(() => {
-        if (matchedUser.role === 'admin') {
+        if (data.role === 'admin') {
           push('/admin');
         } else {
           push('/user');
         }
       });
 
-    } else {
+    } catch (err) {
+      console.log(err)
       Swal.fire({
         icon: 'error',
         title: 'Login Gagal',
-        text: 'Email atau Password yang kamu masukkan salah!',
+        text: 'Email atau Password salah atau server error!',
         confirmButtonColor: '#ef4444'
       });
     }
@@ -81,7 +85,7 @@
           <label for="email" class="block text-sm font-semibold text-gray-700"> Email</label>
           <input
             id="email"
-            type="email"
+            type="text"
             placeholder="emailkamu@email.com"
             bind:value={email}
             required
