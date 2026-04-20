@@ -48,9 +48,9 @@
         showConfirmButton: false
       }).then(() => {
         if (matchedUser.role === 'admin') {
-          push('/admin');
+          push('/beranda');
         } else {
-          push('/user');
+          push('/user_absensi');
         }
       });
 

@@ -2,7 +2,8 @@
   import Swal from "sweetalert2";
   import { push } from 'svelte-spa-router';
 
-  let FullName = '';
+  let nama = '';
+  let username = '';
   let email = '';
   let password = '';
   let confirmPassword = '';
@@ -11,7 +12,7 @@
 
   function handleSubmit() {
     
-    if (!FullName || !email || !password || !confirmPassword) {
+    if (!nama || !username || !email || !password || !confirmPassword) {
       Swal.fire({
         icon: 'warning',
         title: 'Data Tidak Lengkap',
@@ -63,7 +64,18 @@
             id="FullName"
             type="text"
             placeholder="Masukkan Nama Lengkap"
-            bind:value={FullName}
+            bind:value={nama}
+            required
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0b5ba2] focus:border-[#0b5ba2] outline-none transition-colors"
+          />
+        </div>
+        <div class="space-y-2">
+          <label for="Username" class="block text-sm font-semibold text-gray-700">Username</label>
+          <input
+            id="FullName"
+            type="text"
+            placeholder="Masukkan Nama Lengkap"
+            bind:value={username}
             required
             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0b5ba2] focus:border-[#0b5ba2] outline-none transition-colors"
           />
