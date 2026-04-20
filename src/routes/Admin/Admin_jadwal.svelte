@@ -3,9 +3,15 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
 
-
   let anggotaList = [
     { nama: "Ahmad Jack", team: "Team A", role: "Captain", position: "Mid Laner", status: "Active" },
+    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
+    { nama: "Siti Pro", team: "Team A", role: "Player", position: "Jungler", status: "Active" },
+    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "Active" },
+    { nama: "Ahmad Jack", team: "Team A", role: "Player", position: "Mid Laner", status: "Active" },
+    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
+    { nama: "Siti Pro", team: "Team A", role: "Coach", position: "Jungler", status: "Active" },
+    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "In-Active" },
     { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
     { nama: "Siti Pro", team: "Team A", role: "Player", position: "Jungler", status: "Active" },
     { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "Active" },
@@ -16,54 +22,24 @@
   ];
 
   $: statistik = {
-    totalanggota : anggotaList.length,
+    totalanggota: anggotaList.length,
 
-      playerAktif: anggotaList.filter(
-      orang => (orang.role === "Player" || orang.role === "Captain") && orang.status === "Active"
+    playerAktif: anggotaList.filter(
+      (orang) => (orang.role === "Player" || orang.role === "Captain") && orang.status === "Active"
     ).length,
 
     playerInAktif: anggotaList.filter(
-      orang => (orang.role === "Player" || orang.role === "Captain") && orang.status === "In-Active"
+      (orang) => (orang.role === "Player" || orang.role === "Captain") && orang.status === "In-Active"
     ).length,
-    
+
     coachAktif: anggotaList.filter(
-      orang => orang.role === "Coach" && orang.status === "Active"
+      (orang) => orang.role === "Coach" && orang.status === "Active"
     ).length,
 
-    teamAktif: [...new Set(anggotaList.map(orang => orang.team))]
-      .filter(namaTim => namaTim !== "No Team").length
+    teamAktif: [...new Set(anggotaList.map((orang) => orang.team))].filter(
+      (namaTim) => namaTim !== "No Team"
+    ).length,
   };
-
-  const urutanRole = {
-    "Coach": 1,
-    "Captain": 2,
-    "Player": 3
-  };
-  $: Datatim = anggotaList.reduce((hasil, anggota) =>{
-  let cektim = hasil.find(team => team.name === anggota.team);
-  if(!cektim) {
-    cektim =  {
-      name: anggota.team,
-      members: []
-    };
-    hasil.push(cektim);
-  }
-  cektim.members.push({
-    name: anggota.nama,
-    role: anggota.role,
-  });
-  return hasil;
-}, []).map(team => {
-    team.members.sort((a, b) => {
-      
-      let nilaiA = urutanRole[a.role] || 99;
-      let nilaiB = urutanRole[b.role] || 99;
-      
-      return nilaiA - nilaiB;
-    });
-
-  return team;
-});
 
   let currentUserName = "Loading...";
 
@@ -96,7 +72,6 @@
   let innerWidth = 0;
   let isSidebarOpen = true;
 
-
   $: if (innerWidth > 0 && innerWidth < 768) {
     isSidebarOpen = false;
   } else if (innerWidth >= 768) {
@@ -117,16 +92,7 @@
     isDropdownOpen = false;
   }
 
-  let isTeamModalOpen = false;
-  let activeAccordion = "";
 
-  function toggleTeamModal() {
-    isTeamModalOpen = !isTeamModalOpen;
-  }
-
-  function toggleAccordion(teamName) {
-    activeAccordion = activeAccordion === teamName ? null : teamName;
-  }
 </script>
 
 <svelte:window bind:innerWidth />
@@ -160,7 +126,7 @@
       </button>
     </div>
 
-    <nav class="flex-1 px-4 space-y-6 overflow-y-auto">
+   <nav class="flex-1 px-4 space-y-6 overflow-y-auto">
       <div>
         <p class="flex items-center gap-2 px-2 mb-2 text-xs font-semibold tracking-wider text-gray-400 uppercase">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -171,7 +137,7 @@
         <button on:click={() => {
                 window.location.href = '#/beranda';
               }} 
-        class="flex items-center w-full gap-3 px-4 py-2.5 text-sm font-medium text-white transition-colors rounded-lg bg-white/10">
+        class="flex items-center w-full gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg text-gray-300 hover:bg-white/5 hover:text-white">
           Beranda
         </button>
       </div>
@@ -209,7 +175,7 @@
             on:click={() => {
               window.location.href = "#/jadwal";
             }}
-            class="flex items-center w-full gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg text-gray-300 hover:bg-white/5 hover:text-white"
+            class="flex items-center w-full gap-3 px-4 py-2.5 text-sm font-medium text-white transition-colors rounded-lg bg-white/10"
           >
             Jadwal
           </button>
@@ -228,7 +194,6 @@
   </aside>
 
   <div class="flex flex-col flex-1 h-full overflow-hidden">
-    
     <header class="flex items-center justify-between h-16 px-8 transition-all duration-300 bg-white border-b border-gray-200 shadow-sm shrink-0 z-10">
       <div class="flex items-center gap-3 text-gray-600">
         <button
@@ -245,7 +210,7 @@
             </svg>
           {/if}
         </button>
-        <h1 class="hidden text-base font-bold text-gray-700 md:block">Dashboard</h1>
+        <h1 class="hidden text-base font-bold text-gray-700 md:block">Management</h1>
       </div>
 
       <div class="relative">
@@ -272,12 +237,12 @@
           <div class="absolute right-0 z-50 w-48 py-2 mt-2 bg-white border border-gray-100 rounded-lg shadow-lg animate-fade-in-down">
             <button
               on:click={() => {
-                window.location.href = '#/settings';
+                window.location.href = "#/settings";
                 closeDropdown();
               }}
               class="flex items-center w-full gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors text-left hover:bg-gray-50"
             >
-            <img class="w-4 h-4 text-gray-500" src="src/assets/setting.svg" alt="Settings Icon" />
+              <img class="w-4 h-4 text-gray-500" src="src/assets/setting.svg" alt="Settings Icon" />
               Settings
             </button>
 
@@ -297,25 +262,9 @@
       </div>
     </header>
 
-    <main class="flex-1 p-8 overflow-x-hidden overflow-y-auto bg-gray-50">
-      <div class="max-w-6xl mx-auto space-y-6">
+    <main class="flex-1 p-10 overflow-x-hidden overflow-y-auto bg-gray-50">
+      <div class="max-w-full mx-auto space-y-7">
         
-        <div class="relative p-8 overflow-hidden text-white shadow-lg bg-gradient-to-r from-[#0a4682] to-[#126bc2] rounded-2xl">
-          <div class="relative z-10">
-            <h2 class="mb-2 text-sm font-bold tracking-widest text-blue-100 uppercase">Jumlah Anggota Saat Ini</h2>
-            <div class="flex items-baseline gap-3 mb-6">
-              <span class="text-7xl font-black">{statistik.totalanggota}</span>
-              <span class="text-2xl font-bold">Anggota</span>
-            </div>
-            <button
-              on:click={toggleTeamModal}
-              class="px-6 py-2 font-bold transition-colors bg-white rounded-lg shadow-md text-[#0a4682] hover:bg-blue-50">
-              Lihat Team
-            </button>
-          </div>
-          <div class="absolute w-64 h-64 bg-white rounded-full opacity-5 -right-10 -top-20 blur-2xl pointer-events-none"></div>
-        </div>
-
         <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
           <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
@@ -326,7 +275,7 @@
             <h3 class="text-4xl font-black text-gray-800">{statistik.playerAktif}</h3>
             <p class="mt-1 text-sm font-medium text-gray-500">Player Aktif</p>
           </div>
-          
+
           <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-red-700 bg-red-100 rounded-xl">
               <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -358,102 +307,9 @@
           </div>
         </div>
 
-        <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-          <div class="px-6 py-5 border-b border-gray-100">
-            <h3 class="text-lg font-bold text-gray-800">Anggota</h3>
-          </div>
-
-          <div class="overflow-x-auto max-h-[400px]">
-            <table class="w-full text-left border-collapse ">
-              <thead class="sticky top-0 z-10 bg-gray-50 outline outline-1 outline-gray-100">
-                <tr class="text-sm text-gray-500 border-b border-gray-100 bg-gray-50">
-                  <th class="px-6 py-4 font-semibold">Nama</th>
-                  <th class="px-6 py-4 font-semibold">Team</th>
-                  <th class="px-6 py-4 font-semibold">Role</th>
-                  <th class="px-6 py-4 font-semibold">Position</th>
-                  <th class="px-6 py-4 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody class="text-sm text-gray-700">
-                {#each anggotaList as orang}
-                  <tr class="transition-colors border-b border-gray-50 hover:bg-gray-50/50">
-                    <td class="px-6 py-4 font-medium text-gray-900">{orang.nama}</td>
-                    <td class="px-6 py-4">{orang.team}</td>
-                    <td class="px-6 py-4">{orang.role}</td>
-                    <td class="px-6 py-4">{orang.position}</td>
-                    <td class="px-6 py-4">
-                      <div class="flex items-center gap-2">
-                        <span class={`w-2 h-2 rounded-full ${orang.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                        {orang.status}
-                      </div>
-                    </td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        
+        
       </div>
     </main>
   </div>
-
-  {#if isTeamModalOpen}
-    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in">
-      <div
-        class="absolute inset-0 cursor-pointer bg-black/40 backdrop-blur-sm"
-        on:click={toggleTeamModal}
-        aria-hidden="true"
-      ></div>
-
-      <div class="relative flex flex-col w-full max-w-2xl shadow-2xl bg-[#f8fafc] rounded-xl max-h-[90vh]">
-        
-        <div class="flex items-center justify-between p-6 bg-white border-b border-gray-100 rounded-t-xl">
-          <h2 class="text-xl font-extrabold text-gray-800">Komposisi Team</h2>
-          <button
-            on:click={toggleTeamModal}
-            class="flex items-center justify-center w-8 h-8 text-white transition-colors shadow-sm bg-[#0a2e52] hover:bg-red-600 rounded-md"
-          >
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div class="p-6 space-y-4 overflow-y-auto">
-          {#each Datatim as team}
-            <div class="overflow-hidden transition-all duration-300 bg-white border border-gray-200 shadow-sm rounded-2xl">
-              
-              <button
-                on:click={() => toggleAccordion(team.name)}
-                class="flex items-center justify-between w-full p-5 transition-colors bg-white hover:bg-gray-50 focus:outline-none"
-              >
-                <span class="text-xl font-bold text-gray-800">{team.name}</span>
-                <svg
-                  class="w-5 h-5 transition-transform duration-300 {activeAccordion === team.name ? 'rotate-180 text-red-500' : 'text-gray-400'}"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {#if activeAccordion === team.name}
-                <div class="px-6 pt-2 pb-5 bg-white border-t border-gray-100 animate-fade-in-down">
-                  {#each team.members as member}
-                    <div class="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                      <span class="pl-2 text-sm font-medium text-gray-600">{member.name}</span>
-                      <span class="pr-2 text-sm font-bold text-gray-800">{member.role}</span>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-
-            </div>
-          {/each}
-        </div>
-      </div>
-    </div>
-  {/if}
-</div>
+</div> 

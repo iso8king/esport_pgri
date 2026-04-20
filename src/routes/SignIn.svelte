@@ -53,7 +53,7 @@
         if (data.role === 'admin') {
           push('/admin');
         } else {
-          push('/user');
+          push('/user_absensi');
         }
       });
 
