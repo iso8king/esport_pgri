@@ -7,6 +7,7 @@
     import Admin_absensi from './routes/Admin/Admin_absensi.svelte';
     import Admin_analisis from './routes/Admin/Admin_analisis.svelte';
     import Admin_jadwal from './routes/Admin/Admin_jadwal.svelte';
+    import Admin_Setting from './routes/Admin/Admin_Setting.svelte';
     import SignIn from './routes/SignIn.svelte';
     import SignUp from './routes/SignUp.svelte';
     import User from './routes/User/User.svelte';
@@ -24,6 +25,7 @@
         '/absensi': Admin_absensi,
         '/analisis': Admin_analisis,
         '/jadwal': Admin_jadwal,
+        '/settings': Admin_Setting,
 
 
         '/user': User,

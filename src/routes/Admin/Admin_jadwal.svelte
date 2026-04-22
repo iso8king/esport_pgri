@@ -3,43 +3,46 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
 
-  let anggotaList = [
-    { nama: "Ahmad Jack", team: "Team A", role: "Captain", position: "Mid Laner", status: "Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Player", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "Active" },
-    { nama: "Ahmad Jack", team: "Team A", role: "Player", position: "Mid Laner", status: "Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Coach", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "In-Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Player", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "Active" },
-    { nama: "Ahmad Jack", team: "Team A", role: "Player", position: "Mid Laner", status: "Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Coach", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "In-Active" },
+  let jadwalList = [
+    { event: "Tournament AI", team: "Team A", waktu: "01-01-0001", lokasi: "Tangerang", tipe: "Tournament", status: "Selesai" },
+    { event: "Scrim smk 10", team: "Team A\nTeam B", waktu: "01-02-0001", lokasi: "Tangerang", tipe: "Scrim", status: "In 1 days" },
   ];
 
+  let teamOptions = ["Team A", "Team B", "Team C"];
+  let tipeOptions = ["Tournament", "Scrim"];
+
   $: statistik = {
-    totalanggota: anggotaList.length,
-
-    playerAktif: anggotaList.filter(
-      (orang) => (orang.role === "Player" || orang.role === "Captain") && orang.status === "Active"
-    ).length,
-
-    playerInAktif: anggotaList.filter(
-      (orang) => (orang.role === "Player" || orang.role === "Captain") && orang.status === "In-Active"
-    ).length,
-
-    coachAktif: anggotaList.filter(
-      (orang) => orang.role === "Coach" && orang.status === "Active"
-    ).length,
-
-    teamAktif: [...new Set(anggotaList.map((orang) => orang.team))].filter(
-      (namaTim) => namaTim !== "No Team"
-    ).length,
+    jadwalTournament: jadwalList.filter(j => j.tipe === "Tournament").length,
+    jadwalScrim: jadwalList.filter(j => j.tipe === "Scrim").length,
+    jumlahTeam: [...new Set(jadwalList.flatMap(j => j.team.split("\n")))].length,
   };
+
+  // Modal state
+  let isModalOpen = false;
+  let formData = { namaAcara: "", tanggalAcara: "", lokasi: "", team: "", tipe: "" };
+
+  function openModal() { isModalOpen = true; }
+  function closeModal() {
+    isModalOpen = false;
+    formData = { namaAcara: "", tanggalAcara: "", lokasi: "", team: "", tipe: "" };
+  }
+
+  function handleSubmit() {
+    if (!formData.namaAcara || !formData.tanggalAcara || !formData.lokasi || !formData.team || !formData.tipe) {
+      Swal.fire({ icon: "warning", title: "Lengkapi semua field!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+    jadwalList = [...jadwalList, {
+      event: formData.namaAcara,
+      team: formData.team,
+      waktu: formData.tanggalAcara,
+      lokasi: formData.lokasi,
+      tipe: formData.tipe,
+      status: "Upcoming"
+    }];
+    Swal.fire({ icon: "success", title: "Jadwal berhasil dibuat!", confirmButtonColor: "#0a4682" });
+    closeModal();
+  }
 
   let currentUserName = "Loading...";
 
@@ -210,7 +213,7 @@
             </svg>
           {/if}
         </button>
-        <h1 class="hidden text-base font-bold text-gray-700 md:block">Management</h1>
+        <h1 class="hidden text-base font-bold text-gray-700 md:block">Jadwal</h1>
       </div>
 
       <div class="relative">
@@ -262,54 +265,213 @@
       </div>
     </header>
 
-    <main class="flex-1 p-10 overflow-x-hidden overflow-y-auto bg-gray-50">
+    <main class="flex-1 p-4 overflow-x-hidden overflow-y-auto sm:p-6 lg:p-10 bg-gray-50">
       <div class="max-w-full mx-auto space-y-7">
         
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
-          <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h2 class="text-2xl font-extrabold text-gray-800 lg:text-3xl">Event & Tournament</h2>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6">
+          <div class="flex flex-col justify-center p-5 bg-white border border-gray-100 shadow-sm sm:p-6 rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+
+              <svg class="w-6 h-6"  viewBox="0 0 2048 2048">
+                <path fill="#46a46a" d="M1792 993q60 41 107 93t81 114t50 131t18 141q0 119-45 224t-124 183t-183 123t-224 46q-91 0-176-27t-156-78t-126-122t-85-157H128V128h256V0h128v128h896V0h128v128h256v865zM256 256v256h1408V256h-128v128h-128V256H512v128H384V256H256zm643 1280q-3-31-3-64q0-86 24-167t73-153h-97v-128h128v86q41-51 91-90t108-67t121-42t128-15q100 0 192 33V640H256v896h643zm573 384q93 0 174-35t142-96t96-142t36-175q0-93-35-174t-96-142t-142-96t-175-36q-93 0-174 35t-142 96t-96 142t-36 175q0 93 35 174t96 142t142 96t175 36zm64-512h192v128h-320v-384h128v256zM384 1024h128v128H384v-128zm256 0h128v128H640v-128zm0-256h128v128H640V768zm0 512h128v128H640v-128zm384-384H896V768h128v128zm256 0h-128V768h128v128zM384 768h128v128H384V768z"/>
               </svg>
             </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.playerAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Player Aktif</p>
+            <h3 class="text-4xl font-black text-gray-800">{statistik.jadwalTournament}</h3>
+            <p class="mt-1 text-sm font-medium text-gray-500">Jadwal Tournament</p>
           </div>
 
-          <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="flex items-center justify-center w-12 h-12 mb-4 text-red-700 bg-red-100 rounded-xl">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.playerInAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Player In-Aktif</p>
-          </div>
-
-          <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+          <div class="flex flex-col justify-center p-5 bg-white border border-gray-100 shadow-sm sm:p-6 rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              <svg class="w-6 h-6"  viewBox="0 0 2048 2048">
+                <path fill="#46a46a" d="M1792 993q60 41 107 93t81 114t50 131t18 141q0 119-45 224t-124 183t-183 123t-224 46q-91 0-176-27t-156-78t-126-122t-85-157H128V128h256V0h128v128h896V0h128v128h256v865zM256 256v256h1408V256h-128v128h-128V256H512v128H384V256H256zm643 1280q-3-31-3-64q0-86 24-167t73-153h-97v-128h128v86q41-51 91-90t108-67t121-42t128-15q100 0 192 33V640H256v896h643zm573 384q93 0 174-35t142-96t96-142t36-175q0-93-35-174t-96-142t-142-96t-175-36q-93 0-174 35t-142 96t-96 142t-36 175q0 93 35 174t96 142t142 96t175 36zm64-512h192v128h-320v-384h128v256zM384 1024h128v128H384v-128zm256 0h128v128H640v-128zm0-256h128v128H640V768zm0 512h128v128H640v-128zm384-384H896V768h128v128zm256 0h-128V768h128v128zM384 768h128v128H384V768z"/>
               </svg>
             </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.coachAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Coach Aktif</p>
+            <h3 class="text-4xl font-black text-gray-800">{statistik.jadwalScrim}</h3>
+            <p class="mt-1 text-sm font-medium text-gray-500">Jadwal Scrim</p>
           </div>
 
-          <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+          <div class="flex flex-col justify-center p-5 bg-white border border-gray-100 shadow-sm sm:p-6 rounded-2xl sm:col-span-2 lg:col-span-1">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
               <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.teamAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Team Aktif</p>
+            <h3 class="text-4xl font-black text-gray-800">{statistik.jumlahTeam}</h3>
+            <p class="mt-1 text-sm font-medium text-gray-500">Jumlah Team</p>
           </div>
         </div>
 
-        
+        <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
+          <div class="px-4 py-5 flex items-center justify-between border-b border-gray-100 sm:px-6">
+            <h3 class="text-lg font-bold text-gray-800">Jadwal</h3>
+            <button
+            on:click={openModal}
+            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] hover:shadow-lg active:scale-95"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Buat Jadwal
+          </button>
+          </div>
+
+          <div class="hidden overflow-x-auto sm:block max-h-[400px]">
+            <table class="w-full text-left border-collapse">
+              <thead class="sticky top-0 z-10 bg-gray-50 outline outline-1 outline-gray-100">
+                <tr class="text-sm text-gray-500 border-b border-gray-100 bg-gray-50">
+                  <th class="px-6 py-4 font-semibold">Event</th>
+                  <th class="px-6 py-4 font-semibold">Team</th>
+                  <th class="px-6 py-4 font-semibold">Waktu</th>
+                  <th class="px-6 py-4 font-semibold">Lokasi</th>
+                  <th class="px-6 py-4 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody class="text-sm text-gray-700">
+                {#each jadwalList as jadwal}
+                  <tr class="transition-colors border-b border-gray-50 hover:bg-gray-50/50">
+                    <td class="px-6 py-4 font-medium text-gray-900">{jadwal.event}</td>
+                    <td class="px-6 py-4 whitespace-pre-line">{jadwal.team}</td>
+                    <td class="px-6 py-4">{jadwal.waktu}</td>
+                    <td class="px-6 py-4">{jadwal.lokasi}</td>
+                    <td class="px-6 py-4">
+                      <span class="inline-flex items-center px-3 py-1 text-xs font-bold rounded-full {jadwal.status === 'Selesai' ? 'bg-gray-200 text-gray-600' : jadwal.status === 'Upcoming' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}">
+                        {jadwal.status}
+                      </span>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="block space-y-3 sm:hidden p-4">
+            {#each jadwalList as jadwal}
+              <div class="p-4 border border-gray-100 rounded-xl bg-gray-50/50">
+                <div class="flex items-start justify-between mb-2">
+                  <h4 class="text-sm font-bold text-gray-900">{jadwal.event}</h4>
+                  <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-full {jadwal.status === 'Selesai' ? 'bg-gray-200 text-gray-600' : jadwal.status === 'Upcoming' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}">
+                    {jadwal.status}
+                  </span>
+                </div>
+                <div class="space-y-1 text-xs text-gray-600">
+                  <p><span class="font-semibold">Team:</span> {jadwal.team}</p>
+                  <p><span class="font-semibold">Waktu:</span> {jadwal.waktu}</p>
+                  <p><span class="font-semibold">Lokasi:</span> {jadwal.lokasi}</p>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
         
       </div>
     </main>
   </div>
+
+  {#if isModalOpen}
+    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+      <div
+        class="absolute inset-0 cursor-pointer bg-black/40 backdrop-blur-sm"
+        on:click={closeModal}
+        aria-hidden="true"
+      ></div>
+
+      <div class="relative flex flex-col w-full max-w-lg shadow-2xl bg-[#f8fafc] rounded-xl max-h-[90vh]">
+        
+        <div class="flex items-center justify-between p-5 bg-white border-b border-gray-100 sm:p-6 rounded-t-xl">
+          <h2 class="text-lg font-extrabold text-gray-800 sm:text-xl">Buat Jadwal</h2>
+          <button
+            on:click={closeModal}
+            class="flex items-center justify-center w-8 h-8 text-white transition-colors shadow-sm bg-[#0a2e52] hover:bg-red-600 rounded-md"
+          >
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="p-5 space-y-4 overflow-y-auto sm:p-6">
+          <div>
+            <label for="namaAcara" class="block mb-1.5 text-sm font-semibold text-gray-700">Nama Acara</label>
+            <input
+              id="namaAcara"
+              type="text"
+              bind:value={formData.namaAcara}
+              class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              placeholder="Masukkan nama acara"
+            />
+          </div>
+
+          <div>
+            <label for="tanggalAcara" class="block mb-1.5 text-sm font-semibold text-gray-700">Tanggal Acara</label>
+            <input
+              id="tanggalAcara"
+              type="date"
+              bind:value={formData.tanggalAcara}
+              class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+            />
+          </div>
+
+          <div>
+            <label for="lokasi" class="block mb-1.5 text-sm font-semibold text-gray-700">Lokasi</label>
+            <input
+              id="lokasi"
+              type="text"
+              bind:value={formData.lokasi}
+              class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              placeholder="Masukkan lokasi"
+            />
+          </div>
+
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label for="team" class="block mb-1.5 text-sm font-semibold text-gray-700">Team</label>
+              <select
+                id="team"
+                bind:value={formData.team}
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white appearance-none cursor-pointer"
+              >
+                <option value="" disabled selected>Pilih Team</option>
+                {#each teamOptions as team}
+                  <option value={team}>{team}</option>
+                {/each}
+              </select>
+            </div>
+
+            <div>
+              <label for="tipe" class="block mb-1.5 text-sm font-semibold text-gray-700">Tipe</label>
+              <select
+                id="tipe"
+                bind:value={formData.tipe}
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white appearance-none cursor-pointer"
+              >
+                <option value="" disabled selected>Pilih Tipe</option>
+                {#each tipeOptions as tipe}
+                  <option value={tipe}>{tipe}</option>
+                {/each}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 p-5 bg-white border-t border-gray-100 sm:p-6 rounded-b-xl">
+          <button
+            on:click={closeModal}
+            class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-red-600 rounded-lg shadow-md hover:bg-red-700 active:scale-95"
+          >
+            Cancel
+          </button>
+          <button
+            on:click={handleSubmit}
+            class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] active:scale-95"
+          >
+            Submit
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
 </div> 

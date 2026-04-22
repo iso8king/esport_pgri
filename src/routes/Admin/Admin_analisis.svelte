@@ -3,43 +3,7 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
 
-  let anggotaList = [
-    { nama: "Ahmad Jack", team: "Team A", role: "Captain", position: "Mid Laner", status: "Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Player", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "Active" },
-    { nama: "Ahmad Jack", team: "Team A", role: "Player", position: "Mid Laner", status: "Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Coach", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "In-Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Player", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "Active" },
-    { nama: "Ahmad Jack", team: "Team A", role: "Player", position: "Mid Laner", status: "Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Coach", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "In-Active" },
-  ];
-
-  $: statistik = {
-    totalanggota: anggotaList.length,
-
-    playerAktif: anggotaList.filter(
-      (orang) => (orang.role === "Player" || orang.role === "Captain") && orang.status === "Active"
-    ).length,
-
-    playerInAktif: anggotaList.filter(
-      (orang) => (orang.role === "Player" || orang.role === "Captain") && orang.status === "In-Active"
-    ).length,
-
-    coachAktif: anggotaList.filter(
-      (orang) => orang.role === "Coach" && orang.status === "Active"
-    ).length,
-
-    teamAktif: [...new Set(anggotaList.map((orang) => orang.team))].filter(
-      (namaTim) => namaTim !== "No Team"
-    ).length,
-  };
+  
 
   let currentUserName = "Loading...";
 
@@ -210,7 +174,7 @@
             </svg>
           {/if}
         </button>
-        <h1 class="hidden text-base font-bold text-gray-700 md:block">Management</h1>
+        <h1 class="hidden text-base font-bold text-gray-700 md:block">Analisis</h1>
       </div>
 
       <div class="relative">
@@ -261,55 +225,7 @@
         {/if}
       </div>
     </header>
+  </div> 
 
-    <main class="flex-1 p-10 overflow-x-hidden overflow-y-auto bg-gray-50">
-      <div class="max-w-full mx-auto space-y-7">
-        
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
-          <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.playerAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Player Aktif</p>
-          </div>
-
-          <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="flex items-center justify-center w-12 h-12 mb-4 text-red-700 bg-red-100 rounded-xl">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.playerInAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Player In-Aktif</p>
-          </div>
-
-          <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.coachAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Coach Aktif</p>
-          </div>
-
-          <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.teamAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Team Aktif</p>
-          </div>
-        </div>
-
-        
-        
-      </div>
-    </main>
-  </div>
+    
 </div> 
