@@ -149,8 +149,8 @@ let jadwalAbsen = [
         moodEmoji: "😊",
         moodText: "Good",
         tanggal: "01-01-2000",
-        pelajaran: "Lorem ipsum Lord Maguire",
-        bukti: "Gambar_Bukti_Ahmad.jpg"
+        pelajaran: "Lorem ipsum Ayam pak selamat bu jainal",
+        bukti: "bukti.jpg"
       }
     },
     { 
