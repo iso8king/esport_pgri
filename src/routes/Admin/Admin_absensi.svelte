@@ -127,9 +127,56 @@ let jadwalAbsen = [
 
   let selectedJadwal = null;
 
+  let isLihatModalOpen = false;
+  let selectedSiswaDetail = null;
+
+  function openLihatModal(siswa) {
+    selectedSiswaDetail = siswa;
+    isLihatModalOpen = true;
+  }
+
+  function closeLihatModal() {
+    isLihatModalOpen = false;
+    selectedSiswaDetail = null;
+  }
+
   let detailSiswaAbsen = [
-    { nama: "Ahmad Jack", status: "Sudah Absen", btnLihatDisabled: false },
-    { nama: "Bambang back", status: "Belum Absen", btnLihatDisabled: false },
+    { 
+      nama: "Ahmad Jack", 
+      status: "Sudah Absen", 
+      btnLihatDisabled: false,
+      jawaban: {
+        moodEmoji: "😊",
+        moodText: "Good",
+        tanggal: "01-01-2000",
+        pelajaran: "Lorem ipsum Ayam pak selamat bu jainal",
+        bukti: "bukti.jpg"
+      }
+    },
+    { 
+      nama: "Bambang back", 
+      status: "Belum Absen", 
+      btnLihatDisabled: true, 
+      jawaban: null 
+    },
+    { 
+      nama: "Siti Pro", 
+      status: "Sudah Absen", 
+      btnLihatDisabled: false,
+      jawaban: {
+        moodEmoji: "😐",
+        moodText: "Neutral",
+        tanggal: "01-01-2000",
+        pelajaran: "Hari ini saya belajar rotasi formasi dan cara backup mid-lane.",
+        bukti: "Gambar_Bukti_Siti.jpg"
+      }
+    },
+    { 
+      nama: "Udin Petot", 
+      status: "Belum Absen", 
+      btnLihatDisabled: true, 
+      jawaban: null 
+    }
   ];
 
   function bukaDetailAbsen(jadwal) {
@@ -256,7 +303,7 @@ let jadwalAbsen = [
             </svg>
           {/if}
         </button>
-        <h1 class="hidden text-base font-bold text-gray-700 md:block">Management</h1>
+        <h1 class="hidden text-base font-bold text-gray-700 md:block">Absensi </h1>
       </div>
 
       <div class="relative">
@@ -430,7 +477,7 @@ let jadwalAbsen = [
                         <td class="px-6 py-4 text-center">
                           <button 
                             disabled={siswa.btnLihatDisabled}
-                            class={`px-5 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+                            on:click={() => openLihatModal(siswa)} class={`px-5 py-1.5 text-xs font-bold rounded-lg transition-colors ${
                               siswa.btnLihatDisabled 
                                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
                                 : 'bg-[#0a2e52] text-white hover:bg-blue-900 shadow-sm'
@@ -538,6 +585,61 @@ let jadwalAbsen = [
         </button>
       </div>
 
+    </div>
+  </div>
+{/if}
+{#if isLihatModalOpen && selectedSiswaDetail && selectedJadwal}
+  <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
+    
+    <div class="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-sm" on:click={closeLihatModal} aria-hidden="true"></div>
+
+    <div class="relative flex flex-col w-full max-w-xl bg-white shadow-2xl rounded-2xl">
+      
+      <button on:click={closeLihatModal} class="absolute flex items-center justify-center w-8 h-8 text-white transition-colors bg-[#0a2e52] hover:bg-red-600 rounded-md shadow-sm top-6 right-6 z-10">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+
+      <div class="p-8 md:p-10 space-y-8 overflow-y-auto max-h-[90vh] no-scrollbar">
+        
+        <div>
+          <h2 class="text-lg font-extrabold text-gray-800 pr-10">
+            [{selectedJadwal.minggu}] - {selectedJadwal.judul}
+          </h2>
+          <p class="mt-1 text-xs font-medium text-gray-500">
+            {selectedJadwal.waktu}
+          </p>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <span class="text-[3.5rem] leading-none drop-shadow-sm">
+            {selectedSiswaDetail.jawaban.moodEmoji}
+          </span>
+          <div class="flex flex-col">
+            <span class="text-sm font-extrabold text-gray-800">{selectedSiswaDetail.jawaban.moodText}</span>
+            <span class="text-[11px] font-semibold text-gray-400">{selectedSiswaDetail.jawaban.tanggal}</span>
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <h4 class="text-sm font-extrabold text-gray-800">Apa yang kamu pelajari?</h4>
+          <p class="text-sm font-medium leading-relaxed text-gray-500">
+            {selectedSiswaDetail.jawaban.pelajaran}
+          </p>
+        </div>
+
+        <div class="space-y-3">
+          <h4 class="text-sm font-extrabold text-gray-800">Bukti</h4>
+          
+          <div class="flex items-center justify-center w-full bg-gray-50 border border-gray-200 border-dashed rounded-xl h-44">
+            <div class="flex flex-col items-center gap-2 text-gray-400">
+              <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              <span class="text-xs font-semibold">Lampiran Gambar dari Siswa</span>
+            </div>
+          </div>
+          
+        </div>
+
+      </div>
     </div>
   </div>
 {/if}
