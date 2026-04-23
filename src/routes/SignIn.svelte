@@ -6,67 +6,70 @@
   let showPassword = false;
 
   async function handleSubmit() {
-    if (!email || !password) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Data Tidak Lengkap',
-        text: 'Pastikan email dan password sudah diisi!',
-        confirmButtonColor: '#ef4444'
-      });
-      return;
-    }
-
-    try {
-      const res = await fetch("http://localhost:9999/api/users/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ username: email, password })
-      });
-
-      if (!res.ok) {
-        throw new Error("Login gagal");
-      }
-
-      const data = await res.json();
-      console.log("Response JSON:", data);
-      console.log(data.data.nama)
-
-
-      // ambil dari data.data
-      localStorage.setItem("user_name", data.data.nama);
-      localStorage.setItem("user_role", data.data.role);
-      localStorage.setItem("username", data.data.username);
-      localStorage.setItem("user_game_id", data.data.game_id);
-      localStorage.setItem("user_server_id", data.data.server_id);
-
-
-      Swal.fire({
-        icon: 'success',
-        title: 'Login Berhasil!',
-        text: `Selamat datang kembali, ${data.data.nama}!`,
-        confirmButtonColor: '#3b82f6',
-        timer: 2000,
-        showConfirmButton: false
-      }).then(() => {
-        if (data.role === 'admin') {
-          push('/admin');
-        } else {
-          push('/user_absensi');
-        }
-      });
-
-    } catch (err) {
-      console.log(err)
-      Swal.fire({
-        icon: 'error',
-        title: 'Login Gagal',
-        text: 'Email atau Password salah atau server error!',
-        confirmButtonColor: '#ef4444'
-      });
-    }
+  if (!email || !password) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Data Tidak Lengkap',
+      text: 'Pastikan email dan password sudah diisi!',
+      confirmButtonColor: '#ef4444'
+    });
+    return;
   }
+
+  try {
+    const res = await fetch("http://localhost:9999/api/users/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: 'include',
+      body: JSON.stringify({ username: email, password })
+    });
+
+    if (!res.ok) {
+      throw new Error("Login gagal");
+    }
+
+    const data = await res.json();
+    console.log("Response JSON:", data);
+    
+    // Cek apakah ada cookie yang diset
+    const setCookieHeader = res.headers.get('set-cookie');
+    console.log("Set-Cookie header:", setCookieHeader);
+
+    // Simpan ke localStorage
+    localStorage.setItem("user_name", data.data.nama);
+    localStorage.setItem("user_id", data.data.id);
+    localStorage.setItem("user_role", data.data.role);
+    localStorage.setItem("username", data.data.username);
+    localStorage.setItem("user_game_id", data.data.game_id);
+    localStorage.setItem("user_server_id", data.data.server_id);
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Login Berhasil!',
+      text: `Selamat datang kembali, ${data.data.nama}!`,
+      confirmButtonColor: '#3b82f6',
+      timer: 2000,
+      showConfirmButton: false
+    }).then(() => {
+      if (data.data.role === 'admin') {
+        push('/admin');
+      } else {
+        push('/user_absensi');
+      }
+    });
+
+  } catch (err) {
+    console.log(err);
+    Swal.fire({
+      icon: 'error',
+      title: 'Login Gagal',
+      text: 'Email atau Password salah atau server error!',
+      confirmButtonColor: '#ef4444'
+    });
+  }
+}
 </script>
 
 <div class="min-h-screen bg-gray-700 flex items-center justify-center px-4">

@@ -2,6 +2,7 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
+  
 
 
   let currentUserName = "Loading...";
@@ -33,9 +34,17 @@
     mood: ""     
   };
 
+  // State untuk drag & drop
+  let isDragOver = false;
+  let uploadedFileName = "";
+  let uploadedFileSize = "";
+
   function openAbsenModal(aktivitas) {
     selectedAktivitas = aktivitas;
     formAbsen = { pelajaran: "", bukti: null, mood: "" };
+    uploadedFileName = "";
+    uploadedFileSize = "";
+    isDragOver = false;
     isAbsenModalOpen = true;
   }
 
@@ -48,20 +57,114 @@
     formAbsen.mood = pilihan;
   }
 
-  function submitAbsen() {
+  // Fungsi untuk handle file upload
+  function handleFileUpload(file) {
+    // Validasi tipe file
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    const maxSize = 2 * 1024 * 1024; // 10MB
+    
+    if (!allowedTypes.includes(file.type) && !file.type.startsWith('image/')) {
+      Swal.fire({
+        icon: "error",
+        title: "Format Tidak Didukung",
+        text: "Silakan upload file JPG, PNG, WEBP, atau PDF"
+      });
+      return false;
+    }
+    
+    if (file.size > maxSize) {
+      Swal.fire({
+        icon: "error",
+        title: "Ukuran Terlalu Besar",
+        text: "Maksimal ukuran file adalah 10MB"
+      });
+      return false;
+    }
+    
+    // Simpan file ke formAbsen
+    formAbsen.bukti = file;
+    uploadedFileName = file.name;
+    uploadedFileSize = formatFileSize(file.size);
+    
+    Swal.fire({
+      icon: "success",
+      title: "Berhasil!",
+      text: `File ${file.name} berhasil diupload`,
+      timer: 1500,
+      showConfirmButton: false
+    });
+    
+    return true;
+  }
+  
+  function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+  
+  // Handler untuk drag & drop
+  function onDragOver(event) {
+    event.preventDefault();
+    isDragOver = true;
+  }
+  
+  function onDragLeave(event) {
+    event.preventDefault();
+    isDragOver = false;
+  }
+  
+  function onDrop(event) {
+    event.preventDefault();
+    isDragOver = false;
+    
+    const files = event.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  }
+  
+  // Handler untuk file input
+  function onFileSelect(event) {
+    const files = event.target.files;
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  }
+  
+  // Hapus file
+  function removeFile() {
+    formAbsen.bukti = null;
+    uploadedFileName = "";
+    uploadedFileSize = "";
+    // Reset input file
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) fileInput.value = '';
+  }
+
+  async function submitAbsen() {
     if (!formAbsen.pelajaran || !formAbsen.mood) {
-      Swal.fire({ icon: "warning", title: "Data Belum Lengkap", text: "Pastikan semua  telah diisi!" });
+      Swal.fire({ icon: "warning", title: "Data Belum Lengkap", text: "Pastikan semua telah diisi!" });
+      return;
+    }
+    
+    if (!formAbsen.bukti) {
+      Swal.fire({ icon: "warning", title: "Bukti Belum Diupload", text: "Silakan upload bukti kegiatan terlebih dahulu!" });
       return;
     }
 
-    // let formData = new FormData();
-    // formData.append('user_id', currentUserId);
+    let formData = new FormData();
+    // formData.append('user_id', localStorage.getItem("user_id"));
     // formData.append('aktivitas_id', selectedAktivitas.id);
     // formData.append('pelajaran', formAbsen.pelajaran);
-    // formData.append('mood', formAbsen.mood);
-    // formData.append('bukti', formAbsen.bukti); // (File dari input type="file")
-    // fetch('/api/absen', { method: 'POST', body: formData })
-
+    formData.append('deskripsi', formAbsen.pelajaran)
+    formData.append('mood', formAbsen.mood);
+    formData.append('bukti', formAbsen.bukti); 
+    const res = await fetch('http://localhost:9999/api/absen/973efa96-8946-4e83-b2cf-907ace651548/create', { method: 'POST', body: formData , credentials : 'include'})
+    const json = await res.json();
+    console.log(json);
     Swal.fire({
       icon: "success",
       title: "Berhasil!",
@@ -329,6 +432,7 @@
 </div>
 
 {#if isAbsenModalOpen && selectedAktivitas}
+<form action="" method="post" enctype="multipart/form-data">
   <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
     
     <div class="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-sm" on:click={closeAbsenModal} aria-hidden="true"></div>
@@ -363,14 +467,62 @@
           <label class="text-sm font-extrabold text-gray-800">
             Bukti <span class="text-red-500">*</span>
           </label>
-          <div class="flex flex-col items-center justify-center p-10 bg-[#fafafa] border border-gray-300 rounded-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
-            <div class="flex items-center justify-center w-10 h-10 mb-3 text-white bg-black rounded-lg shadow-sm">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+          
+          <!-- Drag & Drop Area -->
+          <div 
+            class="flex flex-col items-center justify-center p-10 transition-all duration-200 bg-[#fafafa] border-2 border-dashed rounded-xl {isDragOver ? 'border-[#0a2e52] bg-[#f0f4f9]' : 'border-gray-300'}"
+            class:border-[#0a2e52]={isDragOver}
+            class:bg-[#f0f4f9]={isDragOver}
+            on:dragover={onDragOver}
+            on:dragleave={onDragLeave}
+            on:drop={onDrop}
+          >
+            <div class="flex items-center justify-center w-10 h-10 mb-3 text-white bg-[#0a2e52] rounded-lg shadow-sm">
+              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
             </div>
-            <p class="mb-4 text-xs font-medium text-gray-500">Drag foto atau klik tombol di bawah</p>
             
-            <button class="px-8 py-2 text-sm font-bold text-white transition-colors bg-[#0a2e52] rounded-lg shadow-sm hover:bg-blue-900">
-              Upload
+            {#if !formAbsen.bukti}
+              <p class="mb-2 text-xs font-medium text-gray-500">Drag & drop file di sini atau klik tombol di bawah</p>
+              <p class="mb-4 text-xs text-gray-400">Format: JPG dan PNG (Max 2MB)</p>
+            {:else}
+              <div class="mb-3 text-center">
+                <div class="flex items-center justify-center w-12 h-12 mx-auto mb-2 bg-green-100 rounded-full">
+                  <svg class="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <p class="text-sm font-semibold text-gray-800">{uploadedFileName}</p>
+                <p class="text-xs text-gray-500">{uploadedFileSize}</p>
+                <button 
+                  type="button"
+                  on:click={removeFile}
+                  class="mt-2 text-xs font-medium text-red-600 hover:text-red-700"
+                >
+                  Hapus file
+                </button>
+              </div>
+            {/if}
+            
+            <input 
+              type="file" 
+              id="fileInput"
+              accept="image/*,application/pdf,.jpg,.jpeg,.png,.webp"
+              class="hidden"
+              on:change={onFileSelect}
+            />
+            
+            <button 
+              type="button"
+              on:click={() => document.getElementById('fileInput').click()}
+              class="px-8 py-2 text-sm font-bold text-white transition-colors bg-[#0a2e52] rounded-lg shadow-sm hover:bg-blue-900"
+            >
+              {#if formAbsen.bukti}
+                Ganti File
+              {:else}
+                Upload
+              {/if}
             </button>
           </div>
         </div>
@@ -381,20 +533,23 @@
           </label>
           <div class="flex gap-4">
             <button 
-              on:click={() => setMood('happy')}
-              class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'happy' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}"
+              type="button"
+              on:click={() => setMood('baik')}
+              class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'baik' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}"
             >
               😊
             </button>
             <button 
-              on:click={() => setMood('sad')}
-              class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'sad' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}"
+              type="button"
+              on:click={() => setMood('buruk')}
+              class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'buruk' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}"
             >
               😔
             </button>
             <button 
-              on:click={() => setMood('neutral')}
-              class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'neutral' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}"
+              type="button"
+              on:click={() => setMood('biasa')}
+              class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'biasa' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}"
             >
               😐
             </button>
@@ -404,11 +559,36 @@
       </div>
 
       <div class="flex justify-end p-8 pt-0">
-        <button on:click={submitAbsen} class="px-10 py-3 font-bold text-white transition-colors bg-[#0a2e52] rounded-xl shadow-md hover:bg-blue-900">
+        <button type="button" on:click={submitAbsen} class="px-10 py-3 font-bold text-white transition-colors bg-[#0a2e52] rounded-xl shadow-md hover:bg-blue-900">
           Kirim
         </button>
       </div>
 
     </div>
   </div>
+</form>
 {/if}
+
+<style>
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+</style>
