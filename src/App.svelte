@@ -12,6 +12,8 @@
     import SignUp from './routes/SignUp.svelte';
     import User from './routes/User/User.svelte';
     import User_absensi from './routes/User/User_absensi.svelte';
+    import User_kegiatan from './routes/User/User_kegiatan.svelte';
+    import User_setting from './routes/User/User_setting.svelte';
 
 
     const routes = {
@@ -20,16 +22,17 @@
         '/signin': SignIn,
         '/signup': SignUp,
 
-        '/beranda': Admin,
-        '/anggota': Admin_anggota,
-        '/absensi': Admin_absensi,
-        '/analisis': Admin_analisis,
-        '/jadwal': Admin_jadwal,
-        '/settings': Admin_Setting,
+        '/admin/beranda': Admin,
+        '/admin/anggota': Admin_anggota,
+        '/admin/absensi': Admin_absensi,
+        '/admin/analisis': Admin_analisis,
+        '/admin/jadwal': Admin_jadwal,
+        '/admin/settings': Admin_Setting,
 
 
-        '/user': User,
-        '/user_absensi': User_absensi,
+        '/user/absensi': User_absensi,
+        '/user/kegiatan': User_kegiatan,
+        '/user/settings': User_setting,
 
         //'/user': Home,
         //'/admin': Admin,

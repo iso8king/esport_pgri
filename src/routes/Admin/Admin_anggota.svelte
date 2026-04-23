@@ -187,7 +187,7 @@
           Dashboard
         </p>
         <button on:click={() => {
-                window.location.href = '#/beranda';
+                window.location.href = '#/admin/beranda';
               }} 
         class="flex items-center w-full gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg text-gray-300 hover:bg-white/5 hover:text-white">
           Beranda
@@ -203,13 +203,13 @@
         </p>
         <div class="flex flex-col gap-1">
           <button on:click={() => {
-                window.location.href = '#/anggota';
+                window.location.href = '#/admin/anggota';
               }} class="flex items-center w-full gap-3 px-4 py-2.5 text-sm font-medium text-white transition-colors rounded-lg bg-white/10">
               Anggota
             </button>
           <button
             on:click={() => {
-              window.location.href = "#/absensi";
+              window.location.href = "#/admin/absensi";
             }}
             class="flex items-center w-full gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg text-gray-300 hover:bg-white/5 hover:text-white"
           >
@@ -217,7 +217,7 @@
           </button>
           <button
             on:click={() => {
-              window.location.href = "#/analisis";
+              window.location.href = "#/admin/analisis";
             }}
             class="flex items-center w-full gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg text-gray-300 hover:bg-white/5 hover:text-white"
           >
@@ -225,7 +225,7 @@
           </button>
           <button
             on:click={() => {
-              window.location.href = "#/jadwal";
+              window.location.href = "#/admin/jadwal";
             }}
             class="flex items-center w-full gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg text-gray-300 hover:bg-white/5 hover:text-white"
           >
@@ -262,7 +262,7 @@
             </svg>
           {/if}
         </button>
-        <h1 class="hidden text-base font-bold text-gray-700 md:block">Management</h1>
+        <h1 class="hidden text-base font-bold text-gray-700 md:block">Anggota</h1>
       </div>
 
       <div class="relative">
@@ -289,7 +289,7 @@
           <div class="absolute right-0 z-50 w-48 py-2 mt-2 bg-white border border-gray-100 rounded-lg shadow-lg animate-fade-in-down">
             <button
               on:click={() => {
-                window.location.href = "#/settings";
+                window.location.href = "#/admin/settings";
                 closeDropdown();
               }}
               class="flex items-center w-full gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors text-left hover:bg-gray-50"
