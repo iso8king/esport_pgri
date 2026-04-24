@@ -3,7 +3,16 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
 
-  
+  if(localStorage.getItem("role") !== "admin"){
+    Swal.fire({
+        icon: 'error',
+        title: 'Unauthorized',
+        text: 'Redirecting......',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/user/absensi');
+      });
+  }
 
   let currentUserName = "Loading...";
 

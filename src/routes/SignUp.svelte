@@ -1,23 +1,26 @@
 <script>
+  import { push } from "svelte-spa-router";
   import Swal from "sweetalert2";
-  import { push } from 'svelte-spa-router';
 
-  let nama = '';
-  let username = '';
-  let email = '';
-  let password = '';
-  let confirmPassword = '';
+  let nama = "";
+  let username = "";
+  let email = "";
+  let game_id = "";
+  let server_id = "";
+  let password = "";
+  let confirmPassword = "";
   let showPassword = false;
   let showConfirmPassword = false;
+  let isLoading = false;
 
-  function handleSubmit() {
-    
-    if (!nama || !username || !email || !password || !confirmPassword) {
+  async function handleSubmit() {
+    // Validasi
+    if (!nama || !username || !email || !game_id || !server_id || !password || !confirmPassword) {
       Swal.fire({
         icon: 'warning',
         title: 'Data Tidak Lengkap',
-        text: 'Pastikan semua kolom sudah diisi!',
-        confirmButtonColor: '#ef4444'
+        text: 'Pastikan semua field sudah diisi!',
+        confirmButtonColor: '#0b5ba2'
       });
       return;
     }
@@ -25,29 +28,73 @@
     if (password !== confirmPassword) {
       Swal.fire({
         icon: 'error',
-        title: 'Gagal Validasi',
-        text: 'Password dan konfirmasi password tidak cocok!',
+        title: 'Password Tidak Cocok',
+        text: 'Password dan konfirmasi password harus sama!',
         confirmButtonColor: '#ef4444'
       });
       return;
     }
 
-    Swal.fire({
-      icon: 'success',
-      title: 'Registrasi Berhasil',
-      text: 'Akun dummy berhasil dibuat! Silakan login.',
-      confirmButtonColor: '#3b82f6',
-      timer: 2000, 
-      showConfirmButton: false
-    }).then(() => {
-      push('/SignIn'); 
-    });
+    if (password.length <= 8) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Password Terlalu Pendek',
+        text: 'Password minimal 8 karakter!',
+        confirmButtonColor: '#ef4444'
+      });
+      return;
+    }
+
+    isLoading = true;
+
+    try {
+      const response = await fetch("http://localhost:9999/api/users/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          nama: nama,
+          username: username,
+          email: email,
+          game_id: game_id,
+          server_id: server_id,
+          password: password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.status != 200) {
+        throw new Error(data.message || "Registrasi gagal");
+      }
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Registrasi Berhasil!',
+        text: 'Silakan login dan aktivasi akun anda setelah login!',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/SignIn');
+      });
+
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Registrasi Gagal',
+        text: err.message || 'Terjadi kesalahan pada server',
+        confirmButtonColor: '#ef4444'
+      });
+    } finally {
+      isLoading = false;
+    }
   }
 </script>
 
-<div class="min-h-screen bg-gray-700 flex items-center justify-center px-4">
+<div class="min-h-screen bg-gray-700 flex items-center justify-center px-4 py-8">
   <div class="w-full max-w-md">
-  <img src="src/assets/bglogin.jpg" alt="background" class="absolute inset-0 w-full h-full object-cover opacity-20">
+    <img src="src/assets/bglogin.jpg" alt="background" class="absolute inset-0 w-full h-full object-cover opacity-20">
     
     <div class="border border-gray-200 bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl overflow-hidden relative z-10">
       
@@ -56,8 +103,9 @@
         <p class="text-lg font-semibold text-gray-500 mt-3">SIGN UP</p>
       </div>
 
-      <form on:submit|preventDefault={handleSubmit} class="p-6 space-y-5">
+      <form on:submit|preventDefault={handleSubmit} class="p-6 space-y-4">
         
+        <!-- Nama Lengkap -->
         <div class="space-y-2">
           <label for="FullName" class="block text-sm font-semibold text-gray-700">Nama Lengkap</label>
           <input
@@ -69,18 +117,21 @@
             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0b5ba2] focus:border-[#0b5ba2] outline-none transition-colors"
           />
         </div>
+
+        <!-- Username -->
         <div class="space-y-2">
           <label for="Username" class="block text-sm font-semibold text-gray-700">Username</label>
           <input
-            id="FullName"
+            id="Username"
             type="text"
-            placeholder="Masukkan Nama Lengkap"
+            placeholder="Masukkan Username"
             bind:value={username}
             required
             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0b5ba2] focus:border-[#0b5ba2] outline-none transition-colors"
           />
         </div>
 
+        <!-- Email -->
         <div class="space-y-2">
           <label for="email" class="block text-sm font-semibold text-gray-700">Email</label>
           <input
@@ -93,6 +144,34 @@
           />
         </div>
 
+        <!-- Game ID & Server ID dalam satu row (2 kolom) -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-2">
+            <label for="game_id" class="block text-sm font-semibold text-gray-700">Game ID</label>
+            <input
+              id="game_id"
+              type="text"
+              placeholder="Game ID"
+              bind:value={game_id}
+              required
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0b5ba2] focus:border-[#0b5ba2] outline-none transition-colors"
+            />
+          </div>
+
+          <div class="space-y-2">
+            <label for="server_id" class="block text-sm font-semibold text-gray-700">Server ID</label>
+            <input
+              id="server_id"
+              type="text"
+              placeholder="Server ID"
+              bind:value={server_id}
+              required
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0b5ba2] focus:border-[#0b5ba2] outline-none transition-colors"
+            />
+          </div>
+        </div>
+
+        <!-- Password -->
         <div class="space-y-2">
           <label for="password" class="block text-sm font-semibold text-gray-700">Password</label>
           <div class="relative">
@@ -118,6 +197,7 @@
           </div>
         </div>
 
+        <!-- Konfirmasi Password -->
         <div class="space-y-2">
           <label for="confirmPassword" class="block text-sm font-semibold text-gray-700">Konfirmasi Password</label>
           <div class="relative">
@@ -143,10 +223,23 @@
           </div>
         </div>
 
+        <!-- Tombol Submit -->
         <div class="pt-4 flex flex-col gap-4">
-          <button type="submit" class="w-full bg-[#0b5ba2] hover:bg-[#0b4c8d] text-white font-bold py-3 rounded-2xl transition-colors tracking-wider">
-            SIGN UP
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            class="w-full bg-[#0b5ba2] hover:bg-[#0b4c8d] text-white font-bold py-3 rounded-2xl transition-colors tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {#if isLoading}
+              <svg class="animate-spin h-5 w-5 mx-auto" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+              </svg>
+            {:else}
+              SIGN UP
+            {/if}
           </button>
+          
           <p class="text-sm text-gray-500 text-center">
             Sudah punya akun?{" "}
             <a href="#/SignIn" class="text-blue-500 font-semibold hover:underline">
@@ -157,6 +250,5 @@
 
       </form>
     </div>
-
   </div>
 </div>

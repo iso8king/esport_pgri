@@ -4,51 +4,400 @@
   import Swal from "sweetalert2";
 
   let currentUserName = "Loading...";
+  let kegiatanList = [];
+  let isLoading = true;
+  
+  // Pagination state
+  let currentPage = 1;
+  let totalItems = 0;
+  let totalPage = 1;
 
-  let kegiatanList = [
-    { id: 1, minggu: "Week 1", judul: "Lorem Ipsum Dolor Sit Amet", tanggal: "9 Juni 2026", waktu: "15.00 - 17.00", status: "Hadir", statusTanggal: "9 Juni 2026", statusWaktu: "16.50", sudahAbsen: true },
-    { id: 2, minggu: "Week 2", judul: "Lorem Ipsum Dolor Sit Amet", tanggal: "19 Juni 2026", waktu: "15.00 - 17.00", status: "-", statusTanggal: "-", statusWaktu: "-", sudahAbsen: false },
-  ];
+  // State untuk menyimpan data absen (id, createdAt)
+  let absenDataMap = new Map(); // { kegiatan_id: { createdAt, deskripsi, mood, bukti_url } }
 
   // Detail modal (untuk yang sudah absen)
   let isDetailOpen = false;
   let selectedKegiatan = null;
 
-  function openDetail(k) { selectedKegiatan = k; isDetailOpen = true; }
-  function closeDetail() { isDetailOpen = false; selectedKegiatan = null; }
-
   // Absen modal (untuk yang belum absen)
   let isAbsenModalOpen = false;
   let selectedAbsen = null;
   let formAbsen = { pelajaran: "", bukti: null, mood: "" };
+  
+  // State untuk drag & drop file
+  let isDragOver = false;
+  let uploadedFileName = "";
+  let uploadedFileSize = "";
+
+  // Format tanggal ke format Indonesia
+  function formatTanggal(dateString) {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("id-ID", { 
+      day: "numeric", 
+      month: "long", 
+      year: "numeric" 
+    });
+  }
+
+  // Format waktu dari ISO date
+  function formatWaktu(dateString) {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    return date.toLocaleTimeString("id-ID", { 
+      hour: "2-digit", 
+      minute: "2-digit" 
+    });
+  }
+
+  // Ambil daftar kegiatan yang sudah di-absen (dengan createdAt)
+  async function fetchSudahAbsenData() {
+    try {
+      const userId = localStorage.getItem("user_id");
+      
+      const response = await fetch(`http://localhost:9999/api/absen/get/complete?user_id=${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal mengambil data absen');
+      }
+
+      const result = await response.json();
+      
+      // Response: { data: [{ kegiatan_id: "id1", createdAt: "2026-04-24T16:59:39.021Z" }] }
+      if (result.data && Array.isArray(result.data)) {
+        // Simpan ke Map untuk akses cepat
+        absenDataMap.clear();
+        result.data.forEach(item => {
+          absenDataMap.set(item.kegiatan_id, {
+            createdAt: item.createdAt,
+            deskripsi: item.deskripsi || null,
+            mood: item.mood || null,
+            bukti_url: item.bukti_url || null
+          });
+        });
+      }
+      
+      console.log('Absen data map:', absenDataMap);
+      
+    } catch (error) {
+      console.error('Error fetching sudah absen data:', error);
+      absenDataMap.clear();
+    }
+  }
+
+  // Ambil data kegiatan dari backend
+  async function fetchKegiatan(page = 1) {
+    isLoading = true;
+    try {
+      const userId = localStorage.getItem("user_id");
+      
+      if (!userId) {
+        Swal.fire({
+          icon: 'error',
+          title: 'User Tidak Ditemukan',
+          text: 'Silakan login kembali',
+          confirmButtonColor: '#0b5ba2'
+        }).then(() => {
+          push('/SignIn');
+        });
+        return;
+      }
+
+      // Panggil API dengan parameter user_id
+      const response = await fetch(`http://localhost:9999/api/kegiatan?user_id=${userId}&page=${page}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal mengambil data kegiatan');
+      }
+
+      const result = await response.json();
+      
+      if (result.data && result.data.data) {
+        const paging = result.data.paging;
+        currentPage = paging.page;
+        totalItems = paging.totalItems;
+        totalPage = paging.totalPage;
+        
+        // Map data kegiatan dan tentukan status sudahAbsen berdasarkan absenDataMap
+        kegiatanList = result.data.data.map(kegiatan => {
+          const absenData = absenDataMap.get(kegiatan.id);
+          const sudahAbsen = !!absenData;
+          
+          return {
+            id: kegiatan.id,
+            minggu: kegiatan.nama_kegiatan ? kegiatan.nama_kegiatan.split(' - ')[0] : "Week",
+            judul: kegiatan.nama_kegiatan ? kegiatan.nama_kegiatan.split(' - ')[1] : kegiatan.nama_kegiatan,
+            tanggal: formatTanggal(kegiatan.tanggal_kegiatan),
+            waktu: kegiatan.jam || "-",
+            status: sudahAbsen ? "Hadir" : "-",
+            statusTanggal: sudahAbsen ? formatTanggal(absenData.createdAt) : "-",
+            statusWaktu: sudahAbsen ? formatWaktu(absenData.createdAt) : "-",
+            sudahAbsen: sudahAbsen,
+            pelajaran: sudahAbsen ? (absenData.deskripsi || null) : null,
+            mood: sudahAbsen ? (absenData.mood || null) : null,
+            bukti_url: sudahAbsen ? (absenData.bukti_url || null) : null,
+            createdAt: sudahAbsen ? absenData.createdAt : null
+          };
+        });
+      } else {
+        kegiatanList = [];
+      }
+      
+    } catch (error) {
+      console.error('Error fetching kegiatan:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Memuat Data',
+        text: 'Tidak dapat mengambil data kegiatan. Silakan coba lagi.',
+        confirmButtonColor: '#0b5ba2'
+      });
+      kegiatanList = [];
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  // Kirim absen ke backend
+  async function submitAbsenToBackend(kegiatanId, formData) {
+    try {
+      const response = await fetch(`http://localhost:9999/api/absen/${kegiatanId}/create`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Gagal mengirim absen');
+      }
+
+      const result = await response.json();
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('Error submitting absen:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Pagination handlers
+  function nextPage() {
+    if (currentPage < totalPage) {
+      fetchKegiatan(currentPage + 1);
+    }
+  }
+
+  function prevPage() {
+    if (currentPage > 1) {
+      fetchKegiatan(currentPage - 1);
+    }
+  }
+
+  function openDetail(k) {
+    selectedKegiatan = k;
+    isDetailOpen = true;
+  }
+  
+  function closeDetail() { 
+    isDetailOpen = false; 
+    selectedKegiatan = null; 
+  }
 
   function openAbsenModal(k) {
     selectedAbsen = k;
     formAbsen = { pelajaran: "", bukti: null, mood: "" };
+    uploadedFileName = "";
+    uploadedFileSize = "";
+    isDragOver = false;
     isAbsenModalOpen = true;
   }
-  function closeAbsenModal() { isAbsenModalOpen = false; selectedAbsen = null; }
-  function setMood(m) { formAbsen.mood = m; }
+  
+  function closeAbsenModal() { 
+    isAbsenModalOpen = false; 
+    selectedAbsen = null; 
+  }
+  
+  function setMood(m) { 
+    formAbsen.mood = m; 
+  }
 
-  function submitAbsen() {
+  // Format file size
+  function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  // Handle file upload
+  function handleFileUpload(file) {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'application/pdf'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
+    if (!allowedTypes.includes(file.type) && !file.type.startsWith('image/')) {
+      Swal.fire({
+        icon: "error",
+        title: "Format Tidak Didukung",
+        text: "Silakan upload file JPG, PNG, WEBP, atau PDF"
+      });
+      return false;
+    }
+    
+    if (file.size > maxSize) {
+      Swal.fire({
+        icon: "error",
+        title: "Ukuran Terlalu Besar",
+        text: "Maksimal ukuran file adalah 10MB"
+      });
+      return false;
+    }
+    
+    formAbsen.bukti = file;
+    uploadedFileName = file.name;
+    uploadedFileSize = formatFileSize(file.size);
+    
+    Swal.fire({
+      icon: "success",
+      title: "Berhasil!",
+      text: `File ${file.name} berhasil diupload`,
+      timer: 1500,
+      showConfirmButton: false
+    });
+    
+    return true;
+  }
+
+  // Drag & drop handlers
+  function onDragOver(event) {
+    event.preventDefault();
+    isDragOver = true;
+  }
+  
+  function onDragLeave(event) {
+    event.preventDefault();
+    isDragOver = false;
+  }
+  
+  function onDrop(event) {
+    event.preventDefault();
+    isDragOver = false;
+    const files = event.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  }
+  
+  function onFileSelect(event) {
+    const files = event.target.files;
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  }
+  
+  function removeFile() {
+    formAbsen.bukti = null;
+    uploadedFileName = "";
+    uploadedFileSize = "";
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) fileInput.value = '';
+  }
+
+  async function submitAbsen() {
     if (!formAbsen.pelajaran || !formAbsen.mood) {
-      Swal.fire({ icon: "warning", title: "Data Belum Lengkap", text: "Pastikan semua field telah diisi!" });
+      Swal.fire({ 
+        icon: "warning", 
+        title: "Data Belum Lengkap", 
+        text: "Pastikan semua telah diisi!" 
+      });
+      return;
+    }
+    
+    if (!formAbsen.bukti) {
+      Swal.fire({ 
+        icon: "warning", 
+        title: "Bukti Belum Diupload", 
+        text: "Silakan upload bukti kegiatan terlebih dahulu!" 
+      });
       return;
     }
 
-    const now = new Date();
-    const tgl = now.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-    const jam = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ".");
-
-    kegiatanList = kegiatanList.map(k => {
-      if (k.id === selectedAbsen.id) {
-        return { ...k, sudahAbsen: true, status: "Hadir", statusTanggal: tgl, statusWaktu: jam };
+    Swal.fire({
+      title: 'Mengirim data...',
+      text: 'Mohon tunggu sebentar',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
       }
-      return k;
     });
 
-    Swal.fire({ icon: "success", title: "Berhasil!", text: "Absen kamu telah terkirim. Terima kasih!", timer: 2000, showConfirmButton: false });
-    closeAbsenModal();
+    let formData = new FormData();
+    formData.append('deskripsi', formAbsen.pelajaran);
+    formData.append('mood', formAbsen.mood);
+    formData.append('bukti', formAbsen.bukti);
+
+    // Kirim dengan menyertakan ID kegiatan sebagai parameter URL
+    const result = await submitAbsenToBackend(selectedAbsen.id, formData);
+
+    if (result.success) {
+      // Simpan response dari server (biasanya berisi data absen yang baru)
+      const responseData = result.data;
+      
+      // Tambahkan data absen ke map dengan createdAt dari server
+      const nowIso = new Date().toISOString();
+      absenDataMap.set(selectedAbsen.id, {
+        createdAt: responseData?.createdAt || nowIso,
+        deskripsi: formAbsen.pelajaran,
+        mood: formAbsen.mood,
+        bukti_url: responseData?.bukti_url || null
+      });
+      
+      // Update UI: ubah status kegiatan yang baru di-absen
+      kegiatanList = kegiatanList.map(k => {
+        if (k.id === selectedAbsen.id) {
+          const absenData = absenDataMap.get(selectedAbsen.id);
+          return { 
+            ...k, 
+            sudahAbsen: true, 
+            status: "Hadir",
+            statusTanggal: formatTanggal(absenData.createdAt),
+            statusWaktu: formatWaktu(absenData.createdAt),
+            pelajaran: formAbsen.pelajaran,
+            mood: formAbsen.mood,
+            createdAt: absenData.createdAt
+          };
+        }
+        return k;
+      });
+
+      Swal.fire({ 
+        icon: "success", 
+        title: "Berhasil!", 
+        text: "Absen kamu telah terkirim. Terima kasih!", 
+        timer: 2000, 
+        showConfirmButton: false 
+      });
+      
+      closeAbsenModal();
+    } else {
+      Swal.fire({ 
+        icon: "error", 
+        title: "Gagal!", 
+        text: result.error || "Terjadi kesalahan saat mengirim absen", 
+        confirmButtonColor: "#ef4444" 
+      });
+    }
   }
 
   function handleButtonClick(kegiatan) {
@@ -59,26 +408,84 @@
     }
   }
 
-  onMount(() => { currentUserName = localStorage.getItem("user_name") || "User"; });
+  onMount(async () => { 
+    currentUserName = localStorage.getItem("user_name") || "User";
+    
+    const userRole = localStorage.getItem("user_role");
+    if(userRole !== "user"){
+      Swal.fire({
+        icon: 'error',
+        title: 'Unauthorized',
+        text: 'Redirecting......',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/admin/beranda');
+      });
+      return;
+    }
+    
+    // Step 1: Ambil data absen (kegiatan_id + createdAt)
+    await fetchSudahAbsenData();
+    
+    // Step 2: Ambil semua kegiatan
+    await fetchKegiatan();
+  });
 
   function handleLogout() {
-    Swal.fire({ title: "Yakin ingin keluar?", icon: "warning", showCancelButton: true, confirmButtonColor: "#ef4444", cancelButtonColor: "#9ca3af", confirmButtonText: "Ya, Logout!" })
-      .then((r) => { if (r.isConfirmed) { localStorage.removeItem("user_name"); localStorage.removeItem("user_role"); push("/SignIn"); } });
+    Swal.fire({ 
+      title: "Yakin ingin keluar?", 
+      icon: "warning", 
+      showCancelButton: true, 
+      confirmButtonColor: "#ef4444", 
+      cancelButtonColor: "#9ca3af", 
+      confirmButtonText: "Ya, Logout!" 
+    }).then((r) => { 
+      if (r.isConfirmed) { 
+        localStorage.removeItem("user_name"); 
+        localStorage.removeItem("user_role"); 
+        localStorage.removeItem("user_id");
+        push("/SignIn"); 
+      } 
+    });
   }
 
   let innerWidth = 0;
   let isSidebarOpen = true;
-  $: if (innerWidth > 0 && innerWidth < 768) { isSidebarOpen = false; } else if (innerWidth >= 768) { isSidebarOpen = true; }
-  function toggleSidebar() { isSidebarOpen = !isSidebarOpen; }
+  $: if (innerWidth > 0 && innerWidth < 768) { 
+    isSidebarOpen = false; 
+  } else if (innerWidth >= 768) { 
+    isSidebarOpen = true; 
+  }
+  
+  function toggleSidebar() { 
+    isSidebarOpen = !isSidebarOpen; 
+  }
 
   let isDropdownOpen = false;
-  function toggleDropdown() { isDropdownOpen = !isDropdownOpen; }
-  function closeDropdown() { isDropdownOpen = false; }
+  function toggleDropdown() { 
+    isDropdownOpen = !isDropdownOpen; 
+  }
+  function closeDropdown() { 
+    isDropdownOpen = false; 
+  }
 </script>
 
+<!-- SVELTE:WINDOW DI LEVEL TERATAS -->
 <svelte:window bind:innerWidth />
 
+<!-- LOADING STATE -->
+{#if isLoading}
+  <div class="flex items-center justify-center h-screen bg-gray-50">
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0a2e52] mx-auto"></div>
+      <p class="mt-4 text-gray-600">Memuat data kegiatan...</p>
+    </div>
+  </div>
+
+<!-- KONTEN UTAMA (SAMA SEPERTI SEBELUMNYA) -->
+{:else}
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">
+  
   {#if isSidebarOpen && innerWidth < 768}
     <div on:click={toggleSidebar} class="fixed inset-0 z-40 transition-opacity bg-black/50 backdrop-blur-sm" aria-hidden="true"></div>
   {/if}
@@ -154,7 +561,7 @@
               <div class="flex flex-col gap-5">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div class="space-y-2">
-                    <h4 class="text-base font-extrabold text-gray-800 sm:text-lg">[{kegiatan.minggu}] - {kegiatan.judul}</h4>
+                    <h4 class="text-base font-extrabold text-gray-800 sm:text-lg">{kegiatan.minggu} - {kegiatan.judul}</h4>
                     <div class="flex flex-col gap-1 pl-4 text-sm font-medium text-gray-600 sm:pl-6">
                       <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-gray-400 rounded-full shrink-0"></span>{kegiatan.tanggal}</div>
                       <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-gray-400 rounded-full shrink-0"></span>{kegiatan.waktu}</div>
@@ -173,29 +580,58 @@
                   </div>
                 </div>
                 <button on:click={() => handleButtonClick(kegiatan)}
-                  class="w-full py-3 text-sm font-bold transition-all duration-200 rounded-xl cursor-pointer {kegiatan.sudahAbsen ? 'bg-[#0a2e52] text-white shadow-md hover:shadow-lg active:scale-[0.99]' : 'bg-[#0a2e52] text-white shadow-md hover:shadow-lg active:scale-[0.99]'}">
+                  class="w-full py-3 text-sm font-bold transition-all duration-200 rounded-xl cursor-pointer bg-[#0a2e52] text-white shadow-md hover:shadow-lg active:scale-[0.99]">
                   {kegiatan.sudahAbsen ? 'Lihat Detail' : 'Isi Absen'}
                 </button>
                 {#if index !== kegiatanList.length - 1}<hr class="border-gray-100" />{/if}
               </div>
             {:else}
-              <div class="py-12 text-center"><p class="text-base font-semibold text-gray-400">Belum ada kegiatan tersedia.</p></div>
+              <div class="py-12 text-center">
+                <p class="text-base font-semibold text-gray-400">Belum ada kegiatan tersedia.</p>
+                <button on:click={() => fetchKegiatan()} class="mt-4 px-6 py-2 text-sm font-bold text-white bg-[#0a2e52] rounded-lg hover:bg-blue-900">
+                  Refresh
+                </button>
+              </div>
             {/each}
           </div>
+          
+          <!-- Pagination Component -->
+          {#if totalPage > 1}
+            <div class="flex items-center justify-center gap-4 pt-6 mt-6 border-t border-gray-100">
+              <button 
+                on:click={prevPage}
+                disabled={currentPage === 1}
+                class="px-4 py-2 text-sm font-medium text-white transition-colors bg-[#0a2e52] rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-900"
+              >
+                Sebelumnya
+              </button>
+              <span class="text-sm text-gray-600">
+                Halaman {currentPage} dari {totalPage}
+              </span>
+              <button 
+                on:click={nextPage}
+                disabled={currentPage === totalPage}
+                class="px-4 py-2 text-sm font-medium text-white transition-colors bg-[#0a2e52] rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-900"
+              >
+                Selanjutnya
+              </button>
+            </div>
+          {/if}
         </div>
       </div>
     </main>
   </div>
 </div>
+{/if}
 
-<!-- Detail Modal (sudah absen) -->
+<!-- DETAIL MODAL -->
 {#if isDetailOpen && selectedKegiatan}
   <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
     <div class="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-sm" on:click={closeDetail} aria-hidden="true"></div>
     <div class="relative flex flex-col w-full max-w-xl bg-white shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto no-scrollbar z-10">
       <div class="flex items-start justify-between p-6 border-b border-gray-100 sm:p-8">
         <div>
-          <h2 class="text-lg font-black text-gray-800 sm:text-xl">[{selectedKegiatan.minggu}] - {selectedKegiatan.judul}</h2>
+          <h2 class="text-lg font-black text-gray-800 sm:text-xl">{selectedKegiatan.minggu} - {selectedKegiatan.judul}</h2>
           <p class="mt-1 text-sm font-medium text-gray-500">{selectedKegiatan.tanggal} • {selectedKegiatan.waktu}</p>
         </div>
         <button on:click={closeDetail} class="flex items-center justify-center flex-shrink-0 w-8 h-8 text-white transition-colors bg-[#0a2e52] hover:bg-red-600 rounded-md shadow-sm">
@@ -230,12 +666,34 @@
             <p class="text-sm font-bold text-gray-800">{selectedKegiatan.statusWaktu}</p>
           </div>
         </div>
+        {#if selectedKegiatan.pelajaran}
+          <div class="p-4 border rounded-xl bg-blue-50 border-blue-200">
+            <p class="mb-1 text-xs font-bold tracking-wide text-blue-600 uppercase">Apa yang dipelajari</p>
+            <p class="text-sm font-medium text-gray-700">{selectedKegiatan.pelajaran}</p>
+          </div>
+        {/if}
+        {#if selectedKegiatan.mood}
+          <div class="p-4 border rounded-xl bg-purple-50 border-purple-200">
+            <p class="mb-1 text-xs font-bold tracking-wide text-purple-600 uppercase">Mood Hari Ini</p>
+            <p class="text-sm font-medium text-gray-700">
+              {#if selectedKegiatan.mood === 'baik'}😊 Senang
+              {:else if selectedKegiatan.mood === 'buruk'}😔 Sedih
+              {:else}😐 Biasa Saja{/if}
+            </p>
+          </div>
+        {/if}
+        {#if selectedKegiatan.bukti_url}
+          <div class="p-4 border rounded-xl bg-gray-50">
+            <p class="mb-2 text-xs font-bold tracking-wide text-gray-500 uppercase">Bukti Kegiatan</p>
+            <img src={selectedKegiatan.bukti_url} alt="Bukti" class="max-w-full rounded-lg" />
+          </div>
+        {/if}
       </div>
     </div>
   </div>
 {/if}
 
-<!-- Absen Modal (belum absen) -->
+<!-- ABSEN MODAL dengan Drag & Drop -->
 {#if isAbsenModalOpen && selectedAbsen}
   <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
     <div class="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-sm" on:click={closeAbsenModal} aria-hidden="true"></div>
@@ -243,7 +701,7 @@
 
       <div class="flex items-start justify-between p-8 border-b border-gray-100">
         <div>
-          <h2 class="text-xl font-black text-gray-800 mb-1">[{selectedAbsen.minggu}] - {selectedAbsen.judul}</h2>
+          <h2 class="text-xl font-black text-gray-800 mb-1">{selectedAbsen.minggu} - {selectedAbsen.judul}</h2>
           <p class="text-sm font-medium text-gray-500">{selectedAbsen.tanggal} • {selectedAbsen.waktu}</p>
         </div>
         <button on:click={closeAbsenModal} class="flex items-center justify-center flex-shrink-0 w-8 h-8 text-white transition-colors bg-[#0a2e52] hover:bg-red-600 rounded-md shadow-sm">
@@ -268,13 +726,60 @@
           <label class="text-sm font-extrabold text-gray-800">
             Bukti <span class="text-red-500">*</span>
           </label>
-          <div class="flex flex-col items-center justify-center p-10 bg-[#fafafa] border border-gray-300 rounded-xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
-            <div class="flex items-center justify-center w-10 h-10 mb-3 text-white bg-black rounded-lg shadow-sm">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+          
+          <!-- Drag & Drop Area -->
+          <div 
+            class="flex flex-col items-center justify-center p-10 transition-all duration-200 bg-[#fafafa] border-2 border-dashed rounded-xl {isDragOver ? 'border-[#0a2e52] bg-[#f0f4f9]' : 'border-gray-300'}"
+            on:dragover={onDragOver}
+            on:dragleave={onDragLeave}
+            on:drop={onDrop}
+          >
+            <div class="flex items-center justify-center w-10 h-10 mb-3 text-white bg-[#0a2e52] rounded-lg shadow-sm">
+              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
             </div>
-            <p class="mb-4 text-xs font-medium text-gray-500">Drag foto atau klik tombol di bawah</p>
-            <button class="px-8 py-2 text-sm font-bold text-white transition-colors bg-[#0a2e52] rounded-lg shadow-sm hover:bg-blue-900">
-              Upload
+            
+            {#if !formAbsen.bukti}
+              <p class="mb-2 text-xs font-medium text-gray-500">Drag & drop file di sini atau klik tombol di bawah</p>
+              <p class="mb-4 text-xs text-gray-400">Format: JPG, PNG, WEBP, PDF (Max 10MB)</p>
+            {:else}
+              <div class="mb-3 text-center">
+                <div class="flex items-center justify-center w-12 h-12 mx-auto mb-2 bg-green-100 rounded-full">
+                  <svg class="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <p class="text-sm font-semibold text-gray-800">{uploadedFileName}</p>
+                <p class="text-xs text-gray-500">{uploadedFileSize}</p>
+                <button 
+                  type="button"
+                  on:click={removeFile}
+                  class="mt-2 text-xs font-medium text-red-600 hover:text-red-700"
+                >
+                  Hapus file
+                </button>
+              </div>
+            {/if}
+            
+            <input 
+              type="file" 
+              id="fileInput"
+              accept="image/*,application/pdf,.jpg,.jpeg,.png,.webp"
+              class="hidden"
+              on:change={onFileSelect}
+            />
+            
+            <button 
+              type="button"
+              on:click={() => document.getElementById('fileInput').click()}
+              class="px-8 py-2 text-sm font-bold text-white transition-colors bg-[#0a2e52] rounded-lg shadow-sm hover:bg-blue-900"
+            >
+              {#if formAbsen.bukti}
+                Ganti File
+              {:else}
+                Upload
+              {/if}
             </button>
           </div>
         </div>
@@ -284,18 +789,9 @@
             Mood anda hari ini? <span class="text-red-500">*</span>
           </label>
           <div class="flex gap-4">
-            <button
-              on:click={() => setMood('happy')}
-              class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'happy' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}"
-            >😊</button>
-            <button
-              on:click={() => setMood('sad')}
-              class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'sad' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}"
-            >😔</button>
-            <button
-              on:click={() => setMood('neutral')}
-              class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'neutral' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}"
-            >😐</button>
+            <button type="button" on:click={() => setMood('baik')} class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'baik' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}">😊</button>
+            <button type="button" on:click={() => setMood('buruk')} class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'buruk' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}">😔</button>
+            <button type="button" on:click={() => setMood('biasa')} class="text-5xl transition-transform transform hover:scale-110 focus:outline-none {formAbsen.mood === 'biasa' ? 'scale-110 drop-shadow-md grayscale-0' : 'grayscale opacity-70 hover:grayscale-0 hover:opacity-100'}">😐</button>
           </div>
         </div>
       </div>
@@ -309,3 +805,23 @@
     </div>
   </div>
 {/if}
+
+<style>
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+</style>

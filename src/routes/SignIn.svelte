@@ -44,6 +44,8 @@
     localStorage.setItem("username", data.data.username);
     localStorage.setItem("user_game_id", data.data.game_id);
     localStorage.setItem("user_server_id", data.data.server_id);
+    localStorage.setItem("role",data.data.role);
+    localStorage.setItem("email" , data.data.email);
 
     Swal.fire({
       icon: 'success',
@@ -54,9 +56,9 @@
       showConfirmButton: false
     }).then(() => {
       if (data.data.role === 'admin') {
-        push('/admin');
+        push('/admin/beranda');
       } else {
-        push('/user_absensi');
+        push('/user/absensi');
       }
     });
 

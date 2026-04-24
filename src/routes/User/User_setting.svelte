@@ -3,6 +3,17 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
 
+ if(localStorage.getItem("role") !== "user"){
+    Swal.fire({
+        icon: 'error',
+        title: 'Unauthorized',
+        text: 'Redirecting......',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/admin/beranda');
+      });
+  }
+
   let currentUserName = "Loading...";
   let activeTab = "profile";
 
@@ -14,8 +25,10 @@
     if (name) {
       currentUserName = name;
       profile.nama = name;
-      profile.email = name.toLowerCase().replace(/\s/g, "") + "@esport.com";
-      profile.phone = "0812-3456-7890";
+      profile.email = localStorage.getItem("email");
+      profile.game_id = localStorage.getItem("user_game_id");
+      profile.server_id = localStorage.getItem("user_server_id")
+      profile.combine_id = `${profile.game_id} (${profile.server_id})`
     } else {
       push("/");
     }
@@ -192,8 +205,8 @@
                   <input id="email" type="email" bind:value={profile.email} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
                 </div>
                 <div>
-                  <label for="phone" class="block mb-1.5 text-sm font-semibold text-gray-700">No. Telepon</label>
-                  <input id="phone" type="text" bind:value={profile.phone} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <label for="server_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Game ID (Server ID)</label>
+                  <input id="server_id" type="text" bind:value={profile.combine_id} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
                 </div>
               </div>
               <div class="flex justify-end pt-2">

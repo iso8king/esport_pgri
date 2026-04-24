@@ -3,6 +3,18 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
 
+  if(localStorage.getItem("role") !== "admin"){
+    Swal.fire({
+        icon: 'error',
+        title: 'Unauthorized',
+        text: 'Redirecting......',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/user/absensi');
+      });
+  }
+
+
   let jadwalList = [
     { event: "Tournament AI", team: "Team A", waktu: "01-01-0001", lokasi: "Tangerang", tipe: "Tournament", status: "Selesai" },
     { event: "Scrim smk 10", team: "Team A\nTeam B", waktu: "01-02-0001", lokasi: "Tangerang", tipe: "Scrim", status: "In 1 days" },
