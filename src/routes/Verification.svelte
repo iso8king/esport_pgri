@@ -5,29 +5,25 @@
   let codes = ['', '', '', ''];
   let inputs = [];
 
-  // Kode verifikasi dummy
   const VALID_CODE = '1234';
 
   function handleInput(index, event) {
     const value = event.target.value;
 
-    // Hanya angka
     if (!/^\d*$/.test(value)) {
       codes[index] = '';
       return;
     }
 
-    // Ambil digit terakhir saja
+
     codes[index] = value.slice(-1);
 
-    // Auto-focus ke input berikutnya
     if (codes[index] && index < 3) {
       inputs[index + 1].focus();
     }
   }
 
   function handleKeydown(index, event) {
-    // Backspace: hapus dan pindah ke sebelumnya
     if (event.key === 'Backspace') {
       if (!codes[index] && index > 0) {
         codes[index - 1] = '';
@@ -37,7 +33,6 @@
       }
     }
 
-    // Arrow keys navigasi
     if (event.key === 'ArrowLeft' && index > 0) {
       inputs[index - 1].focus();
     }
@@ -52,7 +47,6 @@
     for (let i = 0; i < 4; i++) {
       codes[i] = pasted[i] || '';
     }
-    // Focus ke input terakhir yang terisi atau terakhir
     const lastIndex = Math.min(pasted.length, 3);
     inputs[lastIndex]?.focus();
   }
@@ -95,7 +89,6 @@
         text: 'Kode verifikasi yang kamu masukkan salah!',
         confirmButtonColor: '#ef4444'
       });
-      // Reset kode
       codes = ['', '', '', ''];
       inputs[0]?.focus();
     }
@@ -121,7 +114,6 @@
 
       <form on:submit|preventDefault={handleVerify} class="p-6 space-y-6">
         
-        <!-- 4 Digit Code Input -->
         <div class="flex justify-center gap-3">
           {#each codes as code, i}
             <input
