@@ -42,16 +42,12 @@
       Swal.fire({
         icon: 'success',
         title: 'Login Berhasil!',
-        text: `Selamat datang kembali, ${matchedUser.fullName}!`,
+        text: 'Silakan masukkan kode verifikasi.',
         confirmButtonColor: '#3b82f6',
-        timer: 2000, 
+        timer: 1500, 
         showConfirmButton: false
       }).then(() => {
-        if (matchedUser.role === 'admin') {
-          push('/admin/beranda');
-        } else {
-          push('/user/absensi');
-        }
+        push('/verification');
       });
 
     } else {

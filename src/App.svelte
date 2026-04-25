@@ -10,6 +10,7 @@
     import Admin_Setting from './routes/Admin/Admin_Setting.svelte';
     import SignIn from './routes/SignIn.svelte';
     import SignUp from './routes/SignUp.svelte';
+    import Verification from './routes/Verification.svelte';
     import User from './routes/User/User.svelte';
     import User_absensi from './routes/User/User_absensi.svelte';
     import User_kegiatan from './routes/User/User_kegiatan.svelte';
@@ -21,6 +22,7 @@
 
         '/signin': SignIn,
         '/signup': SignUp,
+        '/verification': Verification,
 
         '/admin/beranda': Admin,
         '/admin/anggota': Admin_anggota,
