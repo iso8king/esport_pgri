@@ -46,6 +46,8 @@
     localStorage.setItem("user_server_id", data.data.server_id);
     localStorage.setItem("role",data.data.role);
     localStorage.setItem("email" , data.data.email);
+    localStorage.setItem("status" , data.data.status);
+
 
     Swal.fire({
       icon: 'success',

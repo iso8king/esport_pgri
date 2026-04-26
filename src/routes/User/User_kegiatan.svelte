@@ -423,6 +423,19 @@
       });
       return;
     }
+
+    const userStatus = localStorage.getItem("status");
+    if(!userStatus){
+      Swal.fire({
+        icon: 'warning',
+        title: 'Belum Verifikasi',
+        text: 'Redirecting......',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/verification');
+      });
+      return;
+    }
     
     // Step 1: Ambil data absen (kegiatan_id + createdAt)
     await fetchSudahAbsenData();

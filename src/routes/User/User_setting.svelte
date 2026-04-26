@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
 
- if(localStorage.getItem("role") !== "user"){
+  if(localStorage.getItem("role") !== "user"){
     Swal.fire({
         icon: 'error',
         title: 'Unauthorized',
@@ -17,30 +17,296 @@
   let currentUserName = "Loading...";
   let activeTab = "profile";
 
-  let profile = { nama: "", email: "", phone: "", role: "User" };
+  let profile = { nama: "", email: "", role: "User", game_id: "", server_id: "" };
   let password = { current: "", new: "", confirm: "" };
+  
+  // State untuk modal OTP
+  let isOtpModalOpen = false;
+  let otpCodes = ['', '', '', ''];
+  let otpInputs = [];
+  let pendingProfileData = null;
+  let pendingPasswordData = null;
+  let otpAction = null; // 'profile' atau 'password'
+  let isLoadingOtp = false;
+  let countdown = 0;
+  let countdownInterval = null;
 
   onMount(() => {
     const name = localStorage.getItem("user_name");
     if (name) {
       currentUserName = name;
       profile.nama = name;
-      profile.email = localStorage.getItem("email");
-      profile.game_id = localStorage.getItem("user_game_id");
-      profile.server_id = localStorage.getItem("user_server_id")
-      profile.combine_id = `${profile.game_id} (${profile.server_id})`
+      profile.email = localStorage.getItem("email") || "";
+      profile.game_id = localStorage.getItem("user_game_id") || "";
+      profile.server_id = localStorage.getItem("user_server_id") || "";
     } else {
       push("/");
     }
+
+    const userRole = localStorage.getItem("user_role");
+    if(userRole !== "user"){
+      Swal.fire({
+        icon: 'error',
+        title: 'Unauthorized',
+        text: 'Redirecting......',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/admin/beranda');
+      });
+      return;
+    }
+
+    const userStatus = localStorage.getItem("status");
+    if(!userStatus){
+      Swal.fire({
+        icon: 'warning',
+        title: 'Belum Verifikasi',
+        text: 'Redirecting......',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/verification');
+      });
+      return;
+    }
   });
 
-  function saveProfile() {
-    localStorage.setItem("user_name", profile.nama);
-    currentUserName = profile.nama;
-    Swal.fire({ icon: "success", title: "Profil berhasil disimpan!", confirmButtonColor: "#0a4682" });
+  // ==================== FUNGSI OTP ====================
+  
+  function startCountdown(seconds = 60) {
+    countdown = seconds;
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+      if (countdown > 0) {
+        countdown--;
+      } else {
+        clearInterval(countdownInterval);
+      }
+    }, 1000);
   }
 
-  function savePassword() {
+  // Kirim OTP ke email
+  async function sendOtpEmail() {
+    try {
+      const response = await fetch("http://localhost:9999/api/users/request/otp", {
+        method: "POST",
+        credentials: 'include'
+      });
+      const data = await response.json();
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'Kode OTP Dikirim!',
+        text: `Kode verifikasi telah dikirim ke ${profile.email}`,
+        confirmButtonColor: '#0b5ba2',
+        timer: 2000,
+        showConfirmButton: false
+      });
+      
+      startCountdown(60);
+      return true;
+    } catch (error) {
+      console.error("Error sending OTP:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Kirim OTP',
+        text: 'Terjadi kesalahan, silakan coba lagi',
+        confirmButtonColor: '#ef4444'
+      });
+      return false;
+    }
+  }
+
+  // Verifikasi OTP
+  async function verifyOtp(otpCode) {
+    try {
+      const response = await fetch("http://localhost:9999/api/users/verify", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          otp: otpCode 
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.status !== 200) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Verifikasi Gagal',
+          text: data.message || 'Kode verifikasi yang kamu masukkan salah!',
+          confirmButtonColor: '#ef4444'
+        });
+        return false;  
+      } else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Verifikasi Berhasil!',
+          text: `Kode OTP valid!`,
+          confirmButtonColor: '#3b82f6',
+          timer: 1500,
+          showConfirmButton: false
+        });
+        return true; 
+      }
+      
+    } catch (error) {
+      console.error("Error verifying OTP:", error);
+      return false; 
+    }
+  }
+
+  // Update profile ke server
+  async function updateProfileToServer(updatedData) {
+    try {
+      const response = await fetch("http://localhost:9999/api/users/updateprofile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedData),
+        credentials: 'include'
+      });
+  
+      if (response.status === 200) {
+        localStorage.setItem("user_name", updatedData.nama);
+        localStorage.setItem("email", updatedData.email);
+        localStorage.setItem("user_game_id", updatedData.game_id);
+        localStorage.setItem("user_server_id", updatedData.server_id);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      return false;
+    }
+  }
+
+  // Update password ke server
+  async function updatePasswordToServer(passwordData) {
+    try {
+      const response = await fetch("http://localhost:9999/api/users/update/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: passwordData.current,
+          password_new: passwordData.new
+        }),
+        credentials: 'include'
+      });
+  
+      if (response.status === 200) {
+        push('/signIn');
+        return true;
+      } else {
+        const data = await response.json();
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal Update Password',
+          text: data.message || 'Password saat ini salah!',
+          confirmButtonColor: '#ef4444'
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error("Error updating password:", error);
+      return false;
+    }
+  }
+
+  // ==================== FUNGSI OTP INPUT ====================
+  
+  function handleOtpInput(index, event) {
+    const value = event.target.value;
+    if (!/^\d*$/.test(value)) {
+      otpCodes[index] = '';
+      return;
+    }
+    otpCodes[index] = value.slice(-1);
+    if (otpCodes[index] && index < 3) {
+      otpInputs[index + 1].focus();
+    }
+  }
+
+  function handleOtpKeydown(index, event) {
+    if (event.key === 'Backspace') {
+      if (!otpCodes[index] && index > 0) {
+        otpCodes[index - 1] = '';
+        otpInputs[index - 1].focus();
+      } else {
+        otpCodes[index] = '';
+      }
+    }
+    if (event.key === 'ArrowLeft' && index > 0) {
+      otpInputs[index - 1].focus();
+    }
+    if (event.key === 'ArrowRight' && index < 3) {
+      otpInputs[index + 1].focus();
+    }
+  }
+
+  function handleOtpPaste(event) {
+    event.preventDefault();
+    const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+    for (let i = 0; i < 4; i++) {
+      otpCodes[i] = pasted[i] || '';
+    }
+    const lastIndex = Math.min(pasted.length, 3);
+    otpInputs[lastIndex]?.focus();
+  }
+
+  function resetOtpModal() {
+    otpCodes = ['', '', '', ''];
+    isOtpModalOpen = false;
+    pendingProfileData = null;
+    pendingPasswordData = null;
+    otpAction = null;
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdown = 0;
+  }
+
+  // ==================== SAVE PROFILE (dengan OTP) ====================
+  
+  async function saveProfile() {
+    if (!profile.nama.trim()) {
+      Swal.fire({ icon: "warning", title: "Nama tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+    if (!profile.email.trim()) {
+      Swal.fire({ icon: "warning", title: "Email tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+    if (!profile.game_id.trim()) {
+      Swal.fire({ icon: "warning", title: "Game ID tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+    if (!profile.server_id.trim()) {
+      Swal.fire({ icon: "warning", title: "Server ID tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+
+    pendingProfileData = {
+      nama: profile.nama,
+      email: profile.email,
+      game_id: profile.game_id,
+      server_id: profile.server_id
+    };
+    otpAction = 'profile';
+
+    const otpSent = await sendOtpEmail();
+    if (otpSent) {
+      otpCodes = ['', '', '', ''];
+      isOtpModalOpen = true;
+      
+      setTimeout(() => {
+        if (otpInputs[0]) otpInputs[0].focus();
+      }, 100);
+    }
+  }
+
+  // ==================== SAVE PASSWORD (dengan OTP) ====================
+  
+  async function savePassword() {
     if (!password.current || !password.new || !password.confirm) {
       Swal.fire({ icon: "warning", title: "Lengkapi semua field!", confirmButtonColor: "#0a4682" });
       return;
@@ -49,17 +315,115 @@
       Swal.fire({ icon: "error", title: "Password baru tidak cocok!", confirmButtonColor: "#0a4682" });
       return;
     }
-    Swal.fire({ icon: "success", title: "Password berhasil diubah!", confirmButtonColor: "#0a4682" });
-    password = { current: "", new: "", confirm: "" };
+    if (password.new.length < 6) {
+      Swal.fire({ icon: "error", title: "Password minimal 6 karakter!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+
+    pendingPasswordData = {
+      current: password.current,
+      new: password.new
+    };
+    otpAction = 'password';
+
+    const otpSent = await sendOtpEmail();
+    if (otpSent) {
+      otpCodes = ['', '', '', ''];
+      isOtpModalOpen = true;
+      
+      setTimeout(() => {
+        if (otpInputs[0]) otpInputs[0].focus();
+      }, 100);
+    }
   }
 
+  // ==================== HANDLE VERIFY OTP ====================
+  
+  async function handleVerifyOtp() {
+    const otpCode = otpCodes.join('');
+    
+    if (otpCode.length !== 4) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Kode Tidak Lengkap',
+        text: 'Masukkan 4 digit kode verifikasi',
+        confirmButtonColor: '#0b5ba2'
+      });
+      return;
+    }
 
+    isLoadingOtp = true;
 
+    try {
+      const isValid = await verifyOtp(otpCode);
+      
+      if (!isValid) {
+        otpCodes = ['', '', '', ''];
+        otpInputs[0]?.focus();
+        return;
+      }
+
+      let updateSuccess = false;
+
+      if (otpAction === 'profile') {
+        updateSuccess = await updateProfileToServer(pendingProfileData);
+        if (updateSuccess) {
+          currentUserName = pendingProfileData.nama;
+        }
+      } else if (otpAction === 'password') {
+        updateSuccess = await updatePasswordToServer(pendingPasswordData);
+        if (updateSuccess) {
+          password = { current: "", new: "", confirm: "" };
+        }
+      }
+      
+      if (updateSuccess) {
+        Swal.fire({
+          icon: "success", 
+          title: otpAction === 'profile' ? "Profil berhasil diperbarui!" : "Password berhasil diubah!", 
+          confirmButtonColor: "#0a4682",
+          timer: 1500,
+          showConfirmButton: false
+        });
+        
+        resetOtpModal();
+      } else {
+        throw new Error(otpAction === 'profile' ? "Gagal update profil" : "Gagal update password");
+      }
+      
+    } catch (error) {
+      console.error("Error:", error);
+      Swal.fire({
+        icon: "error", 
+        title: "Gagal!", 
+        text: error.message || "Terjadi kesalahan saat memperbarui data", 
+        confirmButtonColor: "#ef4444" 
+      });
+    } finally {
+      isLoadingOtp = false;
+    }
+  }
+
+  function resendOtp() {
+    if (countdown > 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Tunggu Sebentar',
+        text: `Silakan tunggu ${countdown} detik sebelum meminta ulang OTP`,
+        confirmButtonColor: '#0b5ba2'
+      });
+      return;
+    }
+    sendOtpEmail();
+  }
+
+  // ==================== LOGOUT & LAYOUT ====================
+  
   function handleLogout() {
     Swal.fire({
       title: "Yakin ingin keluar?", icon: "warning", showCancelButton: true,
       confirmButtonColor: "#ef4444", cancelButtonColor: "#9ca3af", confirmButtonText: "Ya, Logout!",
-    }).then((r) => { if (r.isConfirmed) { localStorage.removeItem("user_name"); localStorage.removeItem("user_role"); push("/SignIn"); } });
+    }).then((r) => { if (r.isConfirmed) { localStorage.removeItem("user_name"); localStorage.removeItem("user_role"); localStorage.removeItem("email"); localStorage.removeItem("user_game_id"); localStorage.removeItem("user_server_id"); push("/SignIn"); } });
   }
 
   let innerWidth = 0;
@@ -181,7 +545,7 @@
           {/each}
         </div>
 
-        <!-- Tab Content -->
+        <!-- Tab Content: Profile -->
         {#if activeTab === "profile"}
           <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
@@ -199,14 +563,18 @@
                   <input id="role" type="text" value={profile.role} disabled class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
                 </div>
               </div>
+              <div>
+                <label for="email" class="block mb-1.5 text-sm font-semibold text-gray-700">Email</label>
+                <input id="email" type="email" bind:value={profile.email} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+              </div>
               <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
-                  <label for="email" class="block mb-1.5 text-sm font-semibold text-gray-700">Email</label>
-                  <input id="email" type="email" bind:value={profile.email} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <label for="game_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Game ID</label>
+                  <input id="game_id" type="text" bind:value={profile.game_id} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
                 </div>
                 <div>
-                  <label for="server_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Game ID (Server ID)</label>
-                  <input id="server_id" type="text" bind:value={profile.combine_id} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <label for="server_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Server ID</label>
+                  <input id="server_id" type="text" bind:value={profile.server_id} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
                 </div>
               </div>
               <div class="flex justify-end pt-2">
@@ -215,6 +583,7 @@
             </div>
           </div>
 
+        <!-- Tab Content: Password -->
         {:else if activeTab === "password"}
           <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
@@ -241,10 +610,116 @@
               </div>
             </div>
           </div>
-
         {/if}
 
       </div>
     </main>
   </div>
 </div>
+
+<!-- MODAL OTP VERIFIKASI -->
+{#if isOtpModalOpen}
+<div class="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
+  <div class="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-sm" on:click={resetOtpModal} aria-hidden="true"></div>
+  
+  <div class="relative flex flex-col w-full max-w-md bg-white shadow-2xl rounded-2xl overflow-hidden">
+    
+    <div class="flex items-start justify-between p-6 border-b border-gray-100">
+      <div>
+        <h2 class="text-xl font-black text-gray-800">Verifikasi Kode OTP</h2>
+        <p class="text-sm text-gray-500 mt-1">Kode verifikasi telah dikirim ke</p>
+        <p class="text-sm font-semibold text-[#0a4682]">{profile.email}</p>
+      </div>
+      <button on:click={resetOtpModal} class="flex items-center justify-center w-8 h-8 text-white transition-colors bg-[#0a2e52] hover:bg-red-600 rounded-md shadow-sm">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+
+    <div class="p-6 space-y-6">
+      <!-- OTP Input -->
+      <div class="flex justify-center gap-3">
+        {#each otpCodes as code, i}
+          <input
+            bind:this={otpInputs[i]}
+            type="text"
+            inputmode="numeric"
+            maxlength="1"
+            value={code}
+            on:input={(e) => handleOtpInput(i, e)}
+            on:keydown={(e) => handleOtpKeydown(i, e)}
+            on:paste={handleOtpPaste}
+            disabled={isLoadingOtp}
+            class="w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl
+                   focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682] outline-none transition-all
+                   bg-white text-gray-800 shadow-sm disabled:opacity-50"
+            autocomplete="off"
+          />
+        {/each}
+      </div>
+
+      <!-- Resend OTP -->
+      <div class="text-center">
+        <p class="text-sm text-gray-500">
+          Tidak menerima kode?
+          <button 
+            on:click={resendOtp} 
+            disabled={countdown > 0}
+            class="font-semibold text-[#0a4682] hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {#if countdown > 0}
+              Kirim ulang ({countdown}s)
+            {:else}
+              Kirim ulang kode
+            {/if}
+          </button>
+        </p>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-3 pt-4">
+        <button 
+          on:click={resetOtpModal} 
+          class="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-colors border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          Batal
+        </button>
+        <button 
+          on:click={handleVerifyOtp} 
+          disabled={isLoadingOtp}
+          class="flex-1 px-4 py-2.5 text-sm font-bold text-white transition-colors bg-[#0a4682] rounded-lg hover:bg-[#0c5599] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {#if isLoadingOtp}
+            <svg class="animate-spin h-5 w-5 mx-auto" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+            </svg>
+          {:else}
+            Verifikasi & Simpan
+          {/if}
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+{/if}
+
+<style>
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+</style>

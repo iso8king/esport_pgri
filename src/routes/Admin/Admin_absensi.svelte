@@ -3,7 +3,18 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
 
-  if(localStorage.getItem("role") !== "admin"){
+  let currentUserName = "Loading...";
+
+  onMount(() => {
+    const name = localStorage.getItem("user_name");
+    if (name) {
+      currentUserName = name;
+    } else {
+      push("/");
+    }
+
+    
+    if(localStorage.getItem("role") !== "admin"){
     Swal.fire({
         icon: 'error',
         title: 'Unauthorized',
@@ -14,14 +25,17 @@
       });
   }
 
-  let currentUserName = "Loading...";
-
-  onMount(() => {
-    const name = localStorage.getItem("user_name");
-    if (name) {
-      currentUserName = name;
-    } else {
-      push("/");
+    const userStatus = localStorage.getItem("status");
+    if(!userStatus){
+      Swal.fire({
+        icon: 'warning',
+        title: 'Belum Verifikasi',
+        text: 'Redirecting......',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/verification');
+      });
+      return;
     }
   });
 

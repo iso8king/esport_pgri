@@ -396,6 +396,8 @@
   function toggleDropdown() { isDropdownOpen = !isDropdownOpen; }
   function closeDropdown() { isDropdownOpen = false; }
 
+  
+
   // Initial load
   onMount(async () => {
     const name = localStorage.getItem("user_name") || "User";
@@ -410,6 +412,19 @@
         confirmButtonColor: '#0b5ba2'
       }).then(() => {
         push('/admin/beranda');
+      });
+      return;
+    }
+
+    const userStatus = localStorage.getItem("status");
+    if(!userStatus){
+      Swal.fire({
+        icon: 'warning',
+        title: 'Belum Verifikasi',
+        text: 'Redirecting......',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/verification');
       });
       return;
     }

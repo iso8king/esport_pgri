@@ -3,16 +3,7 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
 
-  if(localStorage.getItem("role") !== "admin"){
-    Swal.fire({
-        icon: 'error',
-        title: 'Unauthorized',
-        text: 'Redirecting......',
-        confirmButtonColor: '#0b5ba2'
-      }).then(() => {
-        push('/user/absensi');
-      });
-  }
+
 
   let currentUserName = "Loading...";
   let activeTab = "profile";
@@ -30,7 +21,32 @@
     } else {
       push("/");
     }
+
+        if(localStorage.getItem("role") !== "admin"){
+    Swal.fire({
+        icon: 'error',
+        title: 'Unauthorized',
+        text: 'Redirecting......',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/user/absensi');
+      });
+  }
+
+    const userStatus = localStorage.getItem("status");
+    if(!userStatus){
+      Swal.fire({
+        icon: 'warning',
+        title: 'Belum Verifikasi',
+        text: 'Redirecting......',
+        confirmButtonColor: '#0b5ba2'
+      }).then(() => {
+        push('/verification');
+      });
+      return;
+    }
   });
+
 
   function saveProfile() {
     localStorage.setItem("user_name", profile.nama);

@@ -5,7 +5,7 @@
   let codes = ['', '', '', ''];
   let inputs = [];
 
-  const VALID_CODE = '1234';
+  // const VALID_CODE = '1234';
 
   function handleInput(index, event) {
     const value = event.target.value;
@@ -51,46 +51,51 @@
     inputs[lastIndex]?.focus();
   }
 
-  function handleVerify() {
-    const enteredCode = codes.join('');
 
-    if (enteredCode.length < 4) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Kode Tidak Lengkap',
-        text: 'Masukkan 4 digit kode verifikasi!',
-        confirmButtonColor: '#ef4444'
-      });
-      return;
-    }
+  async function handleVerify(){
+    const code = codes.join('');
+    console.log(code);
 
-    if (enteredCode === VALID_CODE) {
-      const role = localStorage.getItem('user_role');
-      const name = localStorage.getItem('user_name');
+    try {
+          const response = await fetch("http://localhost:9999/api/users/verify", {
+            method : "POST",
+            headers: {
+          'Content-Type': 'application/json'
+           },
+          credentials: 'include',
+          body: JSON.stringify({ 
+               otp: code.replace(/,/g, '') // Kirim kode OTP
+          })
+          });
 
-      Swal.fire({
-        icon: 'success',
-        title: 'Verifikasi Berhasil!',
-        text: `Selamat datang, ${name}!`,
-        confirmButtonColor: '#3b82f6',
-        timer: 2000,
-        showConfirmButton: false
-      }).then(() => {
-        if (role === 'admin') {
-          push('/admin/beranda');
-        } else {
-          push('/user/absensi');
-        }
-      });
-    } else {
-      Swal.fire({
+          if(response.status !== 200){
+            Swal.fire({
         icon: 'error',
         title: 'Verifikasi Gagal',
         text: 'Kode verifikasi yang kamu masukkan salah!',
         confirmButtonColor: '#ef4444'
       });
-      codes = ['', '', '', ''];
-      inputs[0]?.focus();
+        codes = ['', '', '', ''];
+        inputs[0]?.focus();
+          } else{
+            Swal.fire({
+        icon: 'success',
+        title: 'Verifikasi Berhasil!',
+        text: `Selamat akun kamu sudah aktif!`,
+        confirmButtonColor: '#3b82f6',
+        timer: 2000,
+        showConfirmButton: false
+      }).then(() => {
+        if (localStorage.getItem("role") === 'admin') {
+          push('/admin/beranda');
+        } else {
+          push('/user/absensi');
+        }
+      });
+          }
+      
+    } catch (e) {
+        console.error("Error : ", e)
     }
   }
 
