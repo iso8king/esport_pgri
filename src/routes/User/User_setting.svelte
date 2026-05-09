@@ -17,7 +17,7 @@
   let currentUserName = "Loading...";
   let activeTab = "profile";
 
-  let profile = { nama: "", email: "", role: "User", game_id: "", server_id: "" };
+  let profile = { nama: "", email: "", role: "User", team: "Team A", game_id: "", server_id: "" };
   let password = { current: "", new: "", confirm: "" };
   
   // State untuk modal OTP
@@ -509,111 +509,149 @@
       </div>
     </header>
 
-    <main class="flex-1 p-4 overflow-x-hidden overflow-y-auto sm:p-6 lg:p-10 bg-gray-50">
-      <div class="max-w-4xl mx-auto space-y-6">
+<main class="flex-1 p-4 overflow-x-hidden overflow-y-auto sm:p-6 lg:p-10 bg-gray-50">
+  <div class="max-w-4xl mx-auto space-y-6">
 
-        <div>
-          <h2 class="text-2xl font-extrabold text-gray-800 lg:text-3xl">Settings</h2>
-          <p class="mt-1 text-sm text-gray-500">Kelola akun dan preferensi Anda</p>
+    <div>
+      <h2 class="text-2xl font-extrabold text-gray-800 lg:text-3xl">Settings</h2>
+      <p class="mt-1 text-sm text-gray-500">Kelola akun dan preferensi Anda</p>
+    </div>
+
+    <!-- Profile Card Top -->
+    <div class="relative p-6 overflow-hidden text-white shadow-lg sm:p-8 bg-gradient-to-r 
+      {profile.team ? 'from-[#0a4682] to-[#126bc2]' : 'from-red-700 to-rose-600'} 
+      rounded-2xl"
+    >
+      <div class="relative z-10 flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+        
+        <div class="flex items-center justify-center w-20 h-20 text-3xl font-black rounded-full bg-white/20 border-2 border-white/40 shrink-0">
+          {currentUserName.charAt(0).toUpperCase()}
         </div>
-
-        <!-- Profile Card Top -->
-        <div class="relative p-6 overflow-hidden text-white shadow-lg sm:p-8 bg-gradient-to-r from-[#0a4682] to-[#126bc2] rounded-2xl">
-          <div class="relative z-10 flex flex-col items-center gap-4 sm:flex-row sm:items-center">
-            <div class="flex items-center justify-center w-20 h-20 text-3xl font-black rounded-full bg-white/20 border-2 border-white/40 shrink-0">
-              {currentUserName.charAt(0).toUpperCase()}
-            </div>
-            <div class="text-center sm:text-left">
-              <h3 class="text-xl font-bold sm:text-2xl">{currentUserName}</h3>
-              <p class="text-sm text-blue-200">{profile.role} • E-Sport PGRI</p>
-              <p class="mt-1 text-xs text-blue-300">{profile.email}</p>
-            </div>
-          </div>
-          <div class="absolute w-64 h-64 bg-white rounded-full opacity-5 -right-10 -top-20 blur-2xl pointer-events-none"></div>
+        
+        <div class="text-center sm:text-left">
+          <h3 class="text-xl font-bold sm:text-2xl">{currentUserName}</h3>
+          
+          <p class="text-sm {profile.team ? 'text-blue-200' : 'text-red-100'}">
+            {profile.role} • {profile.team ? profile.team : 'Belum Ada Tim'}
+          </p>
+          
+          <p class="mt-1 text-xs {profile.team ? 'text-blue-300' : 'text-red-200'}">
+            {profile.email}
+          </p>
         </div>
-
-        <!-- Tabs -->
-        <div class="flex gap-1 p-1 bg-white border border-gray-200 shadow-sm rounded-xl">
-          {#each tabs as tab}
-            <button
-              on:click={() => activeTab = tab.id}
-              class="flex items-center justify-center flex-1 gap-2 px-3 py-2.5 text-sm font-semibold rounded-lg transition-all {activeTab === tab.id ? 'bg-[#0a4682] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}"
-            >
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d={tab.icon} /></svg>
-              <span class="hidden sm:inline">{tab.label}</span>
-            </button>
-          {/each}
-        </div>
-
-        <!-- Tab Content: Profile -->
-        {#if activeTab === "profile"}
-          <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
-              <h3 class="text-lg font-bold text-gray-800">Informasi Profil</h3>
-              <p class="text-sm text-gray-500">Perbarui informasi pribadi Anda</p>
-            </div>
-            <div class="p-5 space-y-5 sm:p-6">
-              <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <div>
-                  <label for="nama" class="block mb-1.5 text-sm font-semibold text-gray-700">Nama Lengkap</label>
-                  <input id="nama" type="text" bind:value={profile.nama} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
-                </div>
-                <div>
-                  <label for="role" class="block mb-1.5 text-sm font-semibold text-gray-700">Role</label>
-                  <input id="role" type="text" value={profile.role} disabled class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
-                </div>
-              </div>
-              <div>
-                <label for="email" class="block mb-1.5 text-sm font-semibold text-gray-700">Email</label>
-                <input id="email" type="email" bind:value={profile.email} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
-              </div>
-              <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <div>
-                  <label for="game_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Game ID</label>
-                  <input id="game_id" type="text" bind:value={profile.game_id} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
-                </div>
-                <div>
-                  <label for="server_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Server ID</label>
-                  <input id="server_id" type="text" bind:value={profile.server_id} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
-                </div>
-              </div>
-              <div class="flex justify-end pt-2">
-                <button on:click={saveProfile} class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] active:scale-95">Simpan Profil</button>
-              </div>
-            </div>
-          </div>
-
-        <!-- Tab Content: Password -->
-        {:else if activeTab === "password"}
-          <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
-              <h3 class="text-lg font-bold text-gray-800">Ubah Password</h3>
-              <p class="text-sm text-gray-500">Pastikan password Anda aman</p>
-            </div>
-            <div class="p-5 space-y-5 sm:p-6">
-              <div>
-                <label for="currentPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Password Saat Ini</label>
-                <input id="currentPw" type="password" bind:value={password.current} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Masukkan password saat ini" />
-              </div>
-              <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <div>
-                  <label for="newPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Password Baru</label>
-                  <input id="newPw" type="password" bind:value={password.new} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Masukkan password baru" />
-                </div>
-                <div>
-                  <label for="confirmPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Konfirmasi Password</label>
-                  <input id="confirmPw" type="password" bind:value={password.confirm} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Ulangi password baru" />
-                </div>
-              </div>
-              <div class="flex justify-end pt-2">
-                <button on:click={savePassword} class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] active:scale-95">Ubah Password</button>
-              </div>
-            </div>
-          </div>
-        {/if}
-
+        
       </div>
-    </main>
+      
+      <div class="absolute w-64 h-64 bg-white rounded-full opacity-5 -right-10 -top-20 blur-2xl pointer-events-none"></div>
+    </div>
+      <!-- Tabs -->
+    <div class="flex gap-1 p-1 bg-white border border-gray-200 shadow-sm rounded-xl">
+      {#each tabs as tab}
+        <button
+          on:click={() => activeTab = tab.id}
+          class="flex items-center justify-center flex-1 gap-2 px-3 py-2.5 text-sm font-semibold rounded-lg transition-all 
+            {activeTab === tab.id 
+              ? (profile.team ? 'bg-[#0a4682] text-white shadow-md' : 'bg-red-700 text-white shadow-md') 
+              : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d={tab.icon} />
+          </svg>
+          <span class="hidden sm:inline">{tab.label}</span>
+        </button>
+      {/each}
+    </div>
+      <!-- Tab Content: Profile -->
+    {#if activeTab === "profile"}
+      <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
+        <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
+          <h3 class="text-lg font-bold text-gray-800">Informasi Profil</h3>
+          <p class="text-sm text-gray-500">Perbarui informasi pribadi Anda</p>
+        </div>
+        
+        <div class="p-5 space-y-5 sm:p-6">
+          <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div>
+              <label for="nama" class="block mb-1.5 text-sm font-semibold text-gray-700">Nama Lengkap</label>
+              <input id="nama" type="text" bind:value={profile.nama} 
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+            </div>
+            <div>
+              <label for="role" class="block mb-1.5 text-sm font-semibold text-gray-700">Role</label>
+              <input id="role" type="text" value={profile.role} disabled 
+                class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
+            </div>
+          </div>
+          
+          <div>
+            <label for="email" class="block mb-1.5 text-sm font-semibold text-gray-700">Email</label>
+            <input id="email" type="email" bind:value={profile.email} 
+              class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+          </div>
+          
+          <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div>
+              <label for="game_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Game ID</label>
+              <input id="game_id" type="text" bind:value={profile.game_id} 
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+            </div>
+            <div>
+              <label for="server_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Server ID</label>
+              <input id="server_id" type="text" bind:value={profile.server_id} 
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+            </div>
+          </div>
+          
+          <div class="flex justify-end pt-2">
+            <button on:click={saveProfile} 
+              class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 {profile.team ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
+            >
+              Simpan Profil
+            </button>
+          </div>
+        </div>
+      </div>
+        <!-- Tab Content: Password -->
+    {:else if activeTab === "password"}
+      <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
+        <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
+          <h3 class="text-lg font-bold text-gray-800">Ubah Password</h3>
+          <p class="text-sm text-gray-500">Pastikan password Anda aman</p>
+        </div>
+        
+        <div class="p-5 space-y-5 sm:p-6">
+          <div>
+            <label for="currentPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Password Saat Ini</label>
+            <input id="currentPw" type="password" bind:value={password.current} placeholder="Masukkan password saat ini"
+              class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+          </div>
+          
+          <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div>
+              <label for="newPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Password Baru</label>
+              <input id="newPw" type="password" bind:value={password.new} placeholder="Masukkan password baru"
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+            </div>
+            <div>
+              <label for="confirmPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Konfirmasi Password</label>
+              <input id="confirmPw" type="password" bind:value={password.confirm} placeholder="Ulangi password baru"
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+            </div>
+          </div>
+          
+          <div class="flex justify-end pt-2">
+            <button on:click={savePassword} 
+              class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 {profile.team ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
+            >
+              Ubah Password
+            </button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+  </div>
+</main>
   </div>
 </div>
 
