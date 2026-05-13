@@ -17,7 +17,7 @@
   let currentUserName = "Loading...";
   let activeTab = "profile";
 
-  let profile = { nama: "", email: "", role: "User", team: "Team A", game_id: "", server_id: "" };
+  let profile = { nama: "", email: "", role: "User", team: "", game_id: "", server_id: "" };
   let password = { current: "", new: "", confirm: "" };
   
   // State untuk modal OTP
@@ -26,7 +26,7 @@
   let otpInputs = [];
   let pendingProfileData = null;
   let pendingPasswordData = null;
-  let otpAction = null; // 'profile' atau 'password'
+  let otpAction = null;
   let isLoadingOtp = false;
   let countdown = 0;
   let countdownInterval = null;
@@ -57,7 +57,7 @@
     }
 
     const userStatus = localStorage.getItem("status");
-    if(!userStatus){
+    if(userStatus === "false"){
       Swal.fire({
         icon: 'warning',
         title: 'Belum Verifikasi',
@@ -69,8 +69,6 @@
       return;
     }
   });
-
-  // ==================== FUNGSI OTP ====================
   
   function startCountdown(seconds = 60) {
     countdown = seconds;
@@ -84,7 +82,6 @@
     }, 1000);
   }
 
-  // Kirim OTP ke email
   async function sendOtpEmail() {
     try {
       const response = await fetch("http://localhost:9999/api/users/request/otp", {
@@ -214,7 +211,6 @@
     }
   }
 
-  // ==================== FUNGSI OTP INPUT ====================
   
   function handleOtpInput(index, event) {
     const value = event.target.value;
@@ -264,8 +260,6 @@
     if (countdownInterval) clearInterval(countdownInterval);
     countdown = 0;
   }
-
-  // ==================== SAVE PROFILE (dengan OTP) ====================
   
   async function saveProfile() {
     if (!profile.nama.trim()) {
@@ -303,8 +297,6 @@
       }, 100);
     }
   }
-
-  // ==================== SAVE PASSWORD (dengan OTP) ====================
   
   async function savePassword() {
     if (!password.current || !password.new || !password.confirm) {
@@ -336,8 +328,6 @@
       }, 100);
     }
   }
-
-  // ==================== HANDLE VERIFY OTP ====================
   
   async function handleVerifyOtp() {
     const otpCode = otpCodes.join('');
@@ -416,8 +406,6 @@
     }
     sendOtpEmail();
   }
-
-  // ==================== LOGOUT & LAYOUT ====================
   
   function handleLogout() {
     Swal.fire({

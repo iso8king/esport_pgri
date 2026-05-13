@@ -74,7 +74,7 @@
         title: 'Verifikasi Gagal',
         text: 'Kode verifikasi yang kamu masukkan salah!',
         confirmButtonColor: '#ef4444'
-      });
+         });
         codes = ['', '', '', ''];
         inputs[0]?.focus();
           } else{
@@ -87,6 +87,7 @@
         showConfirmButton: false
       }).then(() => {
         if (localStorage.getItem("role") === 'admin') {
+           localStorage.setItem("status" , "true");
           push('/admin/beranda');
         } else {
           push('/user/absensi');

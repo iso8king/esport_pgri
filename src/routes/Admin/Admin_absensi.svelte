@@ -5,6 +5,301 @@
 
   let currentUserName = "Loading...";
 
+  // State untuk data dari backend
+  let jadwalAbsen = [];
+  let isLoading = true;
+  let totalUserDiDatabase = 0;
+
+  // State untuk modal
+  let isAddJadwalModalOpen = false;
+  let selectedJadwal = null;
+  let isLihatModalOpen = false;
+  let selectedSiswaDetail = null;
+
+  let formJadwal = {
+    judul: "",
+    tanggal: "",
+    jamMulai: "",
+    jamSelesai: ""
+  };
+
+  let detailSiswaAbsen = [];
+
+  // Fungsi untuk mengambil data kegiatan dari backend
+  async function fetchKegiatanData() {
+    isLoading = true;
+    try {
+      const response = await fetch('http://localhost:9999/api/kegiatan/', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Response kegiatan:', result);
+        
+        const kegiatanData = result.data?.data || [];
+        
+        jadwalAbsen = kegiatanData.map(item => ({
+          id: item.id,
+          judul: item.nama_kegiatan,
+          tanggal: formatDateIndonesian(item.tanggal_kegiatan),
+          waktu: item.jam,
+          totalHadir: 0,
+          statusTanggal: getStatusTanggal(item.tanggal_kegiatan),
+          statusWaktu: getStatusWaktu(item.jam),
+          isDisabled: false
+        }));
+        
+        console.log('JadwalAbsen setelah transformasi:', jadwalAbsen);
+      } else {
+        console.error('Gagal fetch data:', response.status);
+        jadwalAbsen = [];
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      jadwalAbsen = [];
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  // Fungsi untuk mengambil total user dari database
+  async function fetchTotalUser() {
+    try {
+      const response = await fetch('http://localhost:9999/api/user/count', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        totalUserDiDatabase = result.data?.total || 0;
+      }
+    } catch (error) {
+      console.error('Error fetching total user:', error);
+      totalUserDiDatabase = 0;
+    }
+  }
+
+  // Fungsi untuk mengambil detail absen berdasarkan kegiatan
+  async function fetchDetailAbsen(kegiatanId) {
+    try {
+      const response = await fetch(`http://localhost:9999/api/absen/${kegiatanId}/get`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Response absen:', result);
+        
+        // Response struktur: { data: [...] }
+        const absensiData = result.data || [];
+        
+        detailSiswaAbsen = absensiData.map(item => ({
+          id: item.id || Math.random(),
+          nama: item.user?.nama || "Unknown",
+          status: "Sudah Absen", // Karena semua yang ada di response sudah absen
+          btnLihatDisabled: false,
+          jawaban: {
+            moodEmoji: getMoodEmoji(item.mood),
+            moodText: item.mood || "Tidak diketahui",
+            tanggal: formatDateIndonesian(new Date()),
+            pelajaran: item.deskripsi || "-",
+            bukti: item.bukti || null
+          }
+        }));
+        
+        // Update total hadir
+        const totalHadir = absensiData.length;
+        const jadwalIndex = jadwalAbsen.findIndex(j => j.id === kegiatanId);
+        if (jadwalIndex !== -1) {
+          jadwalAbsen[jadwalIndex].totalHadir = totalHadir;
+          jadwalAbsen = [...jadwalAbsen];
+        }
+      } else {
+        console.error('Gagal fetch detail absen:', response.status);
+        detailSiswaAbsen = [];
+      }
+    } catch (error) {
+      console.error('Error fetching detail absen:', error);
+      detailSiswaAbsen = [];
+    }
+  }
+
+  // Helper untuk konversi mood ke emoji
+  function getMoodEmoji(mood) {
+    const moodMap = {
+      'baik': '😊',
+      'biasa': '😐',
+      'senang': '😄',
+      'sedih': '😢',
+      'marah': '😠',
+      'Good': '😊',
+      'Neutral': '😐',
+      'Bad': '😢'
+    };
+    return moodMap[mood?.toLowerCase()] || '😊';
+  }
+
+  function formatDateIndonesian(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    
+    return `${day} ${month} ${year}`;
+  }
+
+  function getStatusTanggal(dateString) {
+    if (!dateString) return "-";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const kegiatanDate = new Date(dateString);
+    kegiatanDate.setHours(0, 0, 0, 0);
+    
+    if (kegiatanDate < today) {
+      return "Terlewat";
+    } else if (kegiatanDate.getTime() === today.getTime()) {
+      return "Hari Ini";
+    } else {
+      return "Mendatang";
+    }
+  }
+
+  function getStatusWaktu(waktuString) {
+    if (!waktuString) return "-";
+    const now = new Date();
+    
+    let endTime = "";
+    if (waktuString.includes("-")) {
+      endTime = waktuString.split("-")[1].trim();
+    } else if (waktuString.includes(":")) {
+      endTime = waktuString;
+    }
+    
+    if (endTime) {
+      const [endHour, endMinute] = endTime.split(/[:.]/).map(Number);
+      const endDate = new Date();
+      endDate.setHours(endHour, endMinute || 0, 0, 0);
+      
+      if (now > endDate) {
+        return "Terlewat";
+      } else {
+        return "Belum Dimulai";
+      }
+    }
+    return "-";
+  }
+
+  $: jadwalTerbaru = jadwalAbsen.length > 0 ? jadwalAbsen[jadwalAbsen.length - 1] : { totalHadir: 0 };
+  $: statistikAbsen = {
+    sudahAbsen: jadwalTerbaru.totalHadir || 0,
+    belumAbsen: totalUserDiDatabase - (jadwalTerbaru.totalHadir || 0)
+  };
+
+  function openAddJadwalModal() {
+    formJadwal = { judul: "", tanggal: "", jamMulai: "", jamSelesai: "" };
+    isAddJadwalModalOpen = true;
+  }
+
+  function closeAddJadwalModal() {
+    isAddJadwalModalOpen = false;
+  }
+
+  async function submitJadwalAbsen() {
+    if (!formJadwal.judul || !formJadwal.tanggal || !formJadwal.jamMulai || !formJadwal.jamSelesai) {
+      Swal.fire({ icon: "warning", title: "Data Belum Lengkap", text: "Pastikan semua kolom telah diisi!" });
+      return;
+    }
+
+    const payload = {
+      nama_kegiatan: formJadwal.judul,
+      tanggal_kegiatan: formJadwal.tanggal,
+      jam: `${formJadwal.jamMulai} - ${formJadwal.jamSelesai}`,
+      onlyTeam: false
+    };
+
+    try {
+      Swal.fire({
+        title: "Menyimpan data...",
+        text: "Mohon tunggu sebentar",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      const response = await fetch(`http://localhost:9999/api/kegiatan/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (response.status !== 200) {
+        throw new Error(result.message || "Gagal menyimpan data");
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Jadwal Dibuat!",
+        text: "Absen baru telah berhasil dipublikasikan.",
+        timer: 1500,
+        showConfirmButton: false
+      });
+
+      closeAddJadwalModal();
+      await fetchKegiatanData();
+      
+    } catch (error) {
+      console.error('Error:', error);
+      Swal.fire({ 
+        icon: "error", 
+        title: "Gagal menyimpan jadwal!", 
+        text: error.message,
+        confirmButtonColor: "#0a4682" 
+      });
+    }
+  }
+
+  function bukaDetailAbsen(jadwal) {
+    selectedJadwal = jadwal;
+    fetchDetailAbsen(jadwal.id);
+  }
+
+  function tutupDetailAbsen() {
+    selectedJadwal = null;
+    detailSiswaAbsen = [];
+  }
+
+  function openLihatModal(siswa) {
+    selectedSiswaDetail = siswa;
+    isLihatModalOpen = true;
+  }
+
+  function closeLihatModal() {
+    isLihatModalOpen = false;
+    selectedSiswaDetail = null;
+  }
+
   onMount(() => {
     const name = localStorage.getItem("user_name");
     if (name) {
@@ -13,9 +308,8 @@
       push("/");
     }
 
-    
-    if(localStorage.getItem("role") !== "admin"){
-    Swal.fire({
+    if (localStorage.getItem("role") !== "admin") {
+      Swal.fire({
         icon: 'error',
         title: 'Unauthorized',
         text: 'Redirecting......',
@@ -23,10 +317,10 @@
       }).then(() => {
         push('/user/absensi');
       });
-  }
+    }
 
     const userStatus = localStorage.getItem("status");
-    if(!userStatus){
+    if (!userStatus) {
       Swal.fire({
         icon: 'warning',
         title: 'Belum Verifikasi',
@@ -37,6 +331,9 @@
       });
       return;
     }
+
+    fetchKegiatanData();
+    fetchTotalUser();
   });
 
   function handleLogout() {
@@ -79,140 +376,10 @@
     isDropdownOpen = false;
   }
 
-  let totalUserDiDatabase = 100; 
 
-  $: jadwalTerbaru = jadwalAbsen.length > 0 ? jadwalAbsen[jadwalAbsen.length - 1] : { totalHadir: 0 };
-
-  $: statistikAbsen = {
-    sudahAbsen: jadwalTerbaru.totalHadir,
-    belumAbsen: totalUserDiDatabase - jadwalTerbaru.totalHadir
-  };
-
-let jadwalAbsen = [
-    {
-      minggu: "Week 1",
-      judul: "Latihan Taktik Mingguan",
-      tanggal: "9 Juni 2026",
-      waktu: "15.00 - 17.00",
-      totalHadir: 50, 
-      statusTanggal: "-",
-      statusWaktu: "-",
-      isDisabled: false 
-    },
-  ];
-  let isAddJadwalModalOpen = false;
-
-  let formJadwal = {
-    minggu: "",
-    judul: "",
-    tanggal: "",
-    jamMulai: "",
-    jamSelesai: ""
-  };
-
-  function openAddJadwalModal() {
-    formJadwal = { minggu: "", judul: "", tanggal: "", jamMulai: "", jamSelesai: "" };
-    isAddJadwalModalOpen = true;
-  }
-
-  function closeAddJadwalModal() {
-    isAddJadwalModalOpen = false;
-  }
-
-  function submitJadwalAbsen() {
-    // Validasi sederhana
-    if (!formJadwal.minggu || !formJadwal.judul || !formJadwal.tanggal || !formJadwal.jamMulai || !formJadwal.jamSelesai) {
-      Swal.fire({ icon: "warning", title: "Data Belum Lengkap", text: "Pastikan semua kolom telah diisi!" });
-      return;
-    }
-
-    const jadwalBaru = {
-      minggu: formJadwal.minggu,
-      judul: formJadwal.judul,
-      tanggal: formJadwal.tanggal, 
-      waktu: `${formJadwal.jamMulai} - ${formJadwal.jamSelesai}`,
-      totalHadir: 0,
-      statusTanggal: "-",
-      statusWaktu: "-",
-      isDisabled: false 
-    };
-
-    jadwalAbsen = [...jadwalAbsen, jadwalBaru];
-
-    closeAddJadwalModal();
-
-    Swal.fire({
-      icon: "success",
-      title: "Jadwal Dibuat!",
-      text: "Absen baru telah berhasil dipublikasikan ke siswa.",
-      timer: 1500,
-      showConfirmButton: false
-    });
-  }
-
-  let selectedJadwal = null;
-
-  let isLihatModalOpen = false;
-  let selectedSiswaDetail = null;
-
-  function openLihatModal(siswa) {
-    selectedSiswaDetail = siswa;
-    isLihatModalOpen = true;
-  }
-
-  function closeLihatModal() {
-    isLihatModalOpen = false;
-    selectedSiswaDetail = null;
-  }
-
-  let detailSiswaAbsen = [
-    { 
-      nama: "Ahmad Jack", 
-      status: "Sudah Absen", 
-      btnLihatDisabled: false,
-      jawaban: {
-        moodEmoji: "😊",
-        moodText: "Good",
-        tanggal: "01-01-2000",
-        pelajaran: "Lorem ipsum Ayam pak selamat bu jainal",
-        bukti: "bukti.jpg"
-      }
-    },
-    { 
-      nama: "Bambang back", 
-      status: "Belum Absen", 
-      btnLihatDisabled: true, 
-      jawaban: null 
-    },
-    { 
-      nama: "Siti Pro", 
-      status: "Sudah Absen", 
-      btnLihatDisabled: false,
-      jawaban: {
-        moodEmoji: "😐",
-        moodText: "Neutral",
-        tanggal: "01-01-2000",
-        pelajaran: "Hari ini saya belajar rotasi formasi dan cara backup mid-lane.",
-        bukti: "Gambar_Bukti_Siti.jpg"
-      }
-    },
-    { 
-      nama: "Udin Petot", 
-      status: "Belum Absen", 
-      btnLihatDisabled: true, 
-      jawaban: null 
-    }
-  ];
-
-  function bukaDetailAbsen(jadwal) {
-    selectedJadwal = jadwal;
-  }
-
-  function tutupDetailAbsen() {
-    selectedJadwal = null;
-  }
 </script>
 
+<!-- HTML sama persis dengan kode Anda, tidak perlu diubah -->
 <svelte:window bind:innerWidth />
 
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">
@@ -328,7 +495,7 @@ let jadwalAbsen = [
             </svg>
           {/if}
         </button>
-        <h1 class="hidden text-base font-bold text-gray-700 md:block">Absensi </h1>
+        <h1 class="hidden text-base font-bold text-gray-700 md:block">Absensi</h1>
       </div>
 
       <div class="relative">
@@ -384,82 +551,83 @@ let jadwalAbsen = [
       <div class="max-w-4xl mx-auto space-y-10">
         
         {#if selectedJadwal === null}
-
-        <div class="flex flex-col items-center justify-center gap-6 sm:flex-row">
-          <div class="flex items-center w-full sm:w-[320px] p-6 space-x-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="flex items-center justify-center w-16 h-16 text-white bg-[#4ade80] rounded-full shadow-lg shadow-green-200">
-              <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+          {#if isLoading}
+            <div class="flex justify-center items-center p-8">
+              <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#0a4682]"></div>
+                <p class="mt-2 text-gray-500">Memuat data...</p>
+              </div>
             </div>
-            <div>
-              <h2 class="text-4xl font-black text-gray-800">{statistikAbsen.sudahAbsen}</h2>
-              <p class="text-sm font-medium text-gray-500">Sudah Absen</p>
-            </div>
-          </div>
-          <div class="flex items-center w-full sm:w-[320px] p-6 space-x-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="flex items-center justify-center w-16 h-16 text-white bg-[#f87171] rounded-full shadow-lg shadow-red-200">
-              <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-            </div>
-            <div>
-              <h2 class="text-4xl font-black text-gray-800">{statistikAbsen.belumAbsen}</h2>
-              <p class="text-sm font-medium text-gray-500">Belum Absen</p>
-            </div>
-          </div>
-        </div>
-       <div class="p-8 bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="flex items-center justify-between pb-5 mb-8 border-b border-gray-100">
-              <h3 class="text-xl font-bold text-gray-800">Daftar Jadwal Absen</h3>
-              <button on:click={openAddJadwalModal} class="px-5 py-2.5 text-sm font-semibold text-[#0a2e52] transition-colors bg-blue-50 border border-blue-100 rounded-lg shadow-sm hover:bg-blue-100 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
-                Absen 
-              </button>
-            </div>
-            
-            <div class="space-y-12">
-              {#each jadwalAbsen as jadwal}
-                <div class="flex flex-col gap-6">
-                  <div class="flex items-start justify-between">
-                    <div class="space-y-3">
-                      <h4 class="text-lg font-extrabold text-gray-800">[{jadwal.minggu}] - {jadwal.judul}</h4>
-                      <div class="pl-6 space-y-1.5 text-sm font-medium text-gray-600">
-                        <p>{jadwal.tanggal}</p>
-                        <p>{jadwal.waktu}</p>
-                      </div>
-                    </div>
-                    <div class="text-right space-y-3 min-w-[120px]">
-                      <h4 class="text-lg font-extrabold text-gray-800">Status</h4>
-                      <div class="space-y-1.5 text-sm font-medium text-gray-600">
-                        <p class="font-bold {jadwal.totalHadir > 0 ? 'text-green-600' : 'text-gray-400'}">
-                          {jadwal.totalHadir > 0 ? `${jadwal.totalHadir}/${totalUserDiDatabase}` : '-'}
-                        </p>
-                        <p>{jadwal.statusTanggal}</p>
-                        <p>{jadwal.statusWaktu}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button 
-                    disabled={jadwal.isDisabled}
-                    on:click={() => bukaDetailAbsen(jadwal)}
-                    class="w-full py-3.5 text-sm font-bold rounded-xl transition-colors
-                      {jadwal.isDisabled 
-                        ? 'bg-gray-300 text-gray-100 cursor-not-allowed' 
-                        : 'bg-[#0a2e52] text-white shadow-md hover:bg-blue-900 cursor-pointer'}"
-                  >
-                    Cek Absen
-                  </button>
-                  
-                  {#if jadwal !== jadwalAbsen[jadwalAbsen.length - 1]}
-                    <hr class="mt-6 border-gray-100" />
-                  {/if}
+          {:else}
+            <div class="flex flex-col items-center justify-center gap-6 sm:flex-row">
+              <div class="flex items-center w-full sm:w-[320px] p-6 space-x-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+                <div class="flex items-center justify-center w-16 h-16 text-white bg-[#4ade80] rounded-full shadow-lg shadow-green-200">
+                  <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
                 </div>
-              {:else}
-                 <p class="text-center text-gray-500">Belum ada jadwal absen dibuat.</p>
-              {/each}
+                <div>
+                  <h2 class="text-4xl font-black text-gray-800">{statistikAbsen.sudahAbsen}</h2>
+                  <p class="text-sm font-medium text-gray-500">Sudah Absen</p>
+                </div>
+              </div>
+              <div class="flex items-center w-full sm:w-[320px] p-6 space-x-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+                <div class="flex items-center justify-center w-16 h-16 text-white bg-[#f87171] rounded-full shadow-lg shadow-red-200">
+                  <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <div>
+                  <h2 class="text-4xl font-black text-gray-800">{statistikAbsen.belumAbsen}</h2>
+                  <p class="text-sm font-medium text-gray-500">Belum Absen</p>
+                </div>
+              </div>
             </div>
-          </div>
+
+            <div class="p-8 bg-white border border-gray-100 shadow-sm rounded-2xl">
+              <div class="flex items-center justify-between pb-5 mb-8 border-b border-gray-100">
+                <h3 class="text-xl font-bold text-gray-800">Daftar Jadwal Absen</h3>
+              
+              </div>
+              
+              <div class="space-y-12">
+                {#each jadwalAbsen as jadwal}
+                  <div class="flex flex-col gap-6">
+                    <div class="flex items-start justify-between">
+                      <div class="space-y-3">
+                        <h4 class="text-lg font-extrabold text-gray-800">{jadwal.judul}</h4>
+                        <div class="pl-6 space-y-1.5 text-sm font-medium text-gray-600">
+                          <p>• {jadwal.tanggal}</p>
+                          <p>• {jadwal.waktu}</p>
+                        </div>
+                      </div>
+                      <div class="text-right space-y-3 min-w-[120px]">
+                        <h4 class="text-lg font-extrabold text-gray-800">Status</h4>
+                        <div class="space-y-1.5 text-sm font-medium text-gray-600">
+                          <p class="font-bold {jadwal.totalHadir > 0 ? 'text-green-600' : 'text-gray-400'}">
+                            {jadwal.totalHadir > 0 ? `${jadwal.totalHadir}/${totalUserDiDatabase}` : '-'}
+                          </p>
+                          <p>{jadwal.statusTanggal}</p>
+                          <!-- <p>{jadwal.statusWaktu}</p> -->
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      on:click={() => bukaDetailAbsen(jadwal)}
+                      class="w-full py-3.5 text-sm font-bold rounded-xl transition-colors bg-[#0a2e52] text-white shadow-md hover:bg-blue-900 cursor-pointer"
+                    >
+                      Cek Absen
+                    </button>
+                    
+                    {#if jadwal !== jadwalAbsen[jadwalAbsen.length - 1]}
+                      <hr class="mt-6 border-gray-100" />
+                    {/if}
+                  </div>
+                {:else}
+                  <p class="text-center text-gray-500">Belum ada jadwal absen dibuat.</p>
+                {/each}
+              </div>
+            </div>
+          {/if}
 
         {:else}
-          
           <div class="space-y-6 animate-fade-in">
             <button on:click={tutupDetailAbsen} class="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-600 transition-colors bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
@@ -467,11 +635,9 @@ let jadwalAbsen = [
             </button>
 
             <div>
-              <h2 class="text-2xl font-black text-gray-800">
-                [{selectedJadwal.minggu}] - {selectedJadwal.judul}
-              </h2>
+              <h2 class="text-2xl font-black text-gray-800">{selectedJadwal.judul}</h2>
               <p class="mt-2 text-sm font-medium text-gray-500">
-                {selectedJadwal.waktu}
+                {selectedJadwal.tanggal} • {selectedJadwal.waktu}
               </p>
             </div>
 
@@ -485,7 +651,6 @@ let jadwalAbsen = [
                   <thead class="bg-white border-b border-gray-100">
                     <tr class="text-sm font-semibold text-gray-600">
                       <th class="px-6 py-4">Nama</th>
-                      <th class="px-6 py-4">Status</th>
                       <th class="px-6 py-4 text-center">Lihat Absen</th>
                     </tr>
                   </thead>
@@ -493,20 +658,10 @@ let jadwalAbsen = [
                     {#each detailSiswaAbsen as siswa}
                       <tr class="transition-colors border-b border-gray-50 hover:bg-gray-50/50">
                         <td class="px-6 py-4 font-medium text-gray-900">{siswa.nama}</td>
-                        <td class="px-6 py-4">
-                          <div class="flex items-center gap-2 font-medium">
-                            <span class={`w-2.5 h-2.5 rounded-full ${siswa.status === 'Sudah Absen' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                            {siswa.status}
-                          </div>
-                        </td>
                         <td class="px-6 py-4 text-center">
                           <button 
-                            disabled={siswa.btnLihatDisabled}
-                            on:click={() => openLihatModal(siswa)} class={`px-5 py-1.5 text-xs font-bold rounded-lg transition-colors ${
-                              siswa.btnLihatDisabled 
-                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
-                                : 'bg-[#0a2e52] text-white hover:bg-blue-900 shadow-sm'
-                            }`}
+                            on:click={() => openLihatModal(siswa)} 
+                            class="px-5 py-1.5 text-xs font-bold rounded-lg transition-colors bg-[#0a2e52] text-white hover:bg-blue-900 shadow-sm"
                           >
                             Lihat
                           </button>
@@ -517,153 +672,66 @@ let jadwalAbsen = [
                 </table>
               </div>
             </div>
-
           </div>
         {/if}
 
       </div>
     </main>
   </div>
-</div> 
-{#if isAddJadwalModalOpen}
-  <div class="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
-    
-    <div class="absolute inset-0 cursor-pointer bg-black/50 backdrop-blur-sm" on:click={closeAddJadwalModal} aria-hidden="true"></div>
+</div>
 
-    <div class="relative flex flex-col w-full max-w-lg shadow-2xl bg-white rounded-xl z-10">
-      
-      <div class="flex items-center justify-between p-6 bg-white border-b border-gray-100 rounded-t-xl">
-        <h2 class="text-xl font-extrabold text-gray-800">Buat Jadwal Absen</h2>
-        <button on:click={closeAddJadwalModal} class="flex items-center justify-center w-8 h-8 text-white transition-colors shadow-sm bg-[#0a2e52] hover:bg-red-600 rounded-md">
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-      </div>
 
-      <div class="p-6 space-y-4">
-        
-        <div class="relative group">
-          <label class="absolute z-10 font-bold text-gray-700 transition-all duration-200 left-4 top-2 text-[11px]">
-            Minggu Ke-
-          </label>
-          <input
-            type="text"
-            bind:value={formJadwal.minggu}
-            placeholder="Contoh: Week 3"
-            class="w-full pt-6 pb-2 pl-4 pr-10 text-sm font-bold text-gray-800 transition-all duration-200 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0a2e52]/20 focus:border-[#0a2e52]"
-          />
-        </div>
-
-        <div class="relative group">
-          <label class="absolute z-10 font-bold text-gray-700 transition-all duration-200 left-4 top-2 text-[11px]">
-            Judul Agenda
-          </label>
-          <input
-            type="text"
-            bind:value={formJadwal.judul}
-            placeholder="Contoh: Evaluasi Scrimmage"
-            class="w-full pt-6 pb-2 pl-4 pr-10 text-sm font-bold text-gray-800 transition-all duration-200 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0a2e52]/20 focus:border-[#0a2e52]"
-          />
-        </div>
-
-        <div class="relative group">
-          <label class="absolute z-10 font-bold text-gray-700 transition-all duration-200 left-4 top-2 text-[11px]">
-            Tanggal Pelaksanaan
-          </label>
-          <input
-            type="date"
-            bind:value={formJadwal.tanggal}
-            class="w-full pt-6 pb-2 pl-4 pr-4 text-sm font-bold text-gray-800 transition-all duration-200 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0a2e52]/20 focus:border-[#0a2e52]"
-          />
-        </div>
-
-        <div class="flex gap-4">
-          <div class="relative group flex-1">
-            <label class="absolute z-10 font-bold text-gray-700 transition-all duration-200 left-4 top-2 text-[11px]">
-              Jam Mulai
-            </label>
-            <input
-              type="time"
-              bind:value={formJadwal.jamMulai}
-              class="w-full pt-6 pb-2 pl-4 pr-4 text-sm font-bold text-gray-800 transition-all duration-200 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0a2e52]/20 focus:border-[#0a2e52]"
-            />
-          </div>
-          <div class="relative group flex-1">
-            <label class="absolute z-10 font-bold text-gray-700 transition-all duration-200 left-4 top-2 text-[11px]">
-              Jam Selesai
-            </label>
-            <input
-              type="time"
-              bind:value={formJadwal.jamSelesai}
-              class="w-full pt-6 pb-2 pl-4 pr-4 text-sm font-bold text-gray-800 transition-all duration-200 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0a2e52]/20 focus:border-[#0a2e52]"
-            />
-          </div>
-        </div>
-
-      </div>
-
-      <div class="flex justify-end gap-3 p-6 bg-gray-50 border-t border-gray-100 rounded-b-xl">
-        <button on:click={closeAddJadwalModal} class="px-6 py-2.5 font-bold text-white transition-colors bg-[#e11d48] rounded-lg shadow-sm hover:bg-red-700">
-          Cancel
-        </button>
-        <button on:click={submitJadwalAbsen} class="px-6 py-2.5 font-bold text-white transition-colors bg-[#0a2e52] rounded-lg shadow-sm hover:bg-blue-900">
-          Buat Jadwal
-        </button>
-      </div>
-
-    </div>
-  </div>
-{/if}
 {#if isLihatModalOpen && selectedSiswaDetail && selectedJadwal}
   <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
-    
     <div class="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-sm" on:click={closeLihatModal} aria-hidden="true"></div>
-
     <div class="relative flex flex-col w-full max-w-xl bg-white shadow-2xl rounded-2xl">
-      
       <button on:click={closeLihatModal} class="absolute flex items-center justify-center w-8 h-8 text-white transition-colors bg-[#0a2e52] hover:bg-red-600 rounded-md shadow-sm top-6 right-6 z-10">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
       </button>
 
-      <div class="p-8 md:p-10 space-y-8 overflow-y-auto max-h-[90vh] no-scrollbar">
-        
+      <div class="p-8 md:p-10 space-y-8 overflow-y-auto max-h-[90vh]">
         <div>
-          <h2 class="text-lg font-extrabold text-gray-800 pr-10">
-            [{selectedJadwal.minggu}] - {selectedJadwal.judul}
-          </h2>
-          <p class="mt-1 text-xs font-medium text-gray-500">
-            {selectedJadwal.waktu}
-          </p>
+          <h2 class="text-lg font-extrabold text-gray-800 pr-10">{selectedJadwal.judul}</h2>
+          <p class="mt-1 text-xs font-medium text-gray-500">{selectedJadwal.tanggal} • {selectedJadwal.waktu}</p>
         </div>
 
-        <div class="flex items-center gap-4">
-          <span class="text-[3.5rem] leading-none drop-shadow-sm">
-            {selectedSiswaDetail.jawaban.moodEmoji}
-          </span>
-          <div class="flex flex-col">
-            <span class="text-sm font-extrabold text-gray-800">{selectedSiswaDetail.jawaban.moodText}</span>
-            <span class="text-[11px] font-semibold text-gray-400">{selectedSiswaDetail.jawaban.tanggal}</span>
-          </div>
-        </div>
-
-        <div class="space-y-1.5">
-          <h4 class="text-sm font-extrabold text-gray-800">Apa yang kamu pelajari?</h4>
-          <p class="text-sm font-medium leading-relaxed text-gray-500">
-            {selectedSiswaDetail.jawaban.pelajaran}
-          </p>
-        </div>
-
-        <div class="space-y-3">
-          <h4 class="text-sm font-extrabold text-gray-800">Bukti</h4>
-          
-          <div class="flex items-center justify-center w-full bg-gray-50 border border-gray-200 border-dashed rounded-xl h-44">
-            <div class="flex flex-col items-center gap-2 text-gray-400">
-              <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              <span class="text-xs font-semibold">Lampiran Gambar dari Siswa</span>
+        {#if selectedSiswaDetail.jawaban}
+          <div class="flex items-center gap-4">
+            <span class="text-[3.5rem] leading-none drop-shadow-sm">{selectedSiswaDetail.jawaban.moodEmoji}</span>
+            <div class="flex flex-col">
+              <span class="text-sm font-extrabold text-gray-800">{selectedSiswaDetail.jawaban.moodText}</span>
+              <span class="text-[11px] font-semibold text-gray-400">{selectedSiswaDetail.jawaban.tanggal}</span>
             </div>
           </div>
-          
-        </div>
 
+          <div class="space-y-1.5">
+            <h4 class="text-sm font-extrabold text-gray-800">Apa yang kamu pelajari?</h4>
+            <p class="text-sm font-medium leading-relaxed text-gray-500">{selectedSiswaDetail.jawaban.pelajaran}</p>
+          </div>
+
+          <div class="space-y-3">
+            <h4 class="text-sm font-extrabold text-gray-800">Bukti</h4>
+            {#if selectedSiswaDetail.jawaban.bukti}
+              <div class="flex items-center justify-center w-full bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+                <img 
+                  src={`http://localhost:9999/assets/${selectedSiswaDetail.jawaban.bukti}`} 
+                  alt="Bukti Absen" 
+                  class="max-w-full h-auto object-cover"
+                />
+                
+              </div>
+            {:else}
+              <div class="flex items-center justify-center w-full bg-gray-50 border border-gray-200 border-dashed rounded-xl h-44">
+                <div class="flex flex-col items-center gap-2 text-gray-400">
+                  <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  <span class="text-xs font-semibold">Tidak ada lampiran gambar</span>
+                </div>
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <p class="text-center text-gray-500">Belum ada data absen</p>
+        {/if}
       </div>
     </div>
   </div>

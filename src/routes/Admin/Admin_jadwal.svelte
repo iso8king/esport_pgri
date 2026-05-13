@@ -3,12 +3,8 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
 
-
-
-  let jadwalList = [
-    { event: "Tournament AI", team: "Team A", waktu: "01-01-0001", lokasi: "Tangerang", tipe: "Tournament", status: "Selesai" },
-    { event: "Scrim smk 10", team: "Team A\nTeam B", waktu: "01-02-0001", lokasi: "Tangerang", tipe: "Scrim", status: "In 1 days" },
-  ];
+  let jadwalList = [];
+  let isLoading = true;
 
   let teamOptions = ["Team A", "Team B", "Team C"];
   let tipeOptions = ["Tournament", "Scrim"];
@@ -16,34 +12,180 @@
   $: statistik = {
     jadwalTournament: jadwalList.filter(j => j.tipe === "Tournament").length,
     jadwalScrim: jadwalList.filter(j => j.tipe === "Scrim").length,
-    jumlahTeam: [...new Set(jadwalList.flatMap(j => j.team.split("\n")))].length,
+    jumlahTeam: 0, // Temporary karena team sudah dihapus
   };
 
   // Modal state
   let isModalOpen = false;
-  let formData = { namaAcara: "", tanggalAcara: "", lokasi: "", team: "", tipe: "" };
+  let formData = {
+    namaAcara: '',
+    tanggalAcara: '',
+    lokasi: '',
+    hanyaUntukTim: false
+  };
 
   function openModal() { isModalOpen = true; }
   function closeModal() {
     isModalOpen = false;
-    formData = { namaAcara: "", tanggalAcara: "", lokasi: "", team: "", tipe: "" };
+    formData = {
+      namaAcara: '',
+      tanggalAcara: '',
+      lokasi: '',
+      hanyaUntukTim: false
+    };
   }
 
-  function handleSubmit() {
-    if (!formData.namaAcara || !formData.tanggalAcara || !formData.lokasi || !formData.team || !formData.tipe) {
-      Swal.fire({ icon: "warning", title: "Lengkapi semua field!", confirmButtonColor: "#0a4682" });
+  // Fungsi untuk mengambil data jadwal dari backend
+  // Fungsi untuk mengambil data jadwal dari backend
+async function fetchJadwalData() {
+  isLoading = true;
+  try {
+    const response = await fetch('http://localhost:9999/api/kegiatan/', {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log('Response dari backend:', result);
+      
+      // Mengambil data dari struktur response: result.data.data
+      const kegiatanData = result.data?.data || [];
+      
+      // Transformasi data dari backend ke format yang digunakan di frontend
+      jadwalList = kegiatanData.map(item => ({
+        id: item.id,
+        event: item.nama_kegiatan,
+        waktu: formatDate(item.tanggal_kegiatan), // ← pakai format baru
+        lokasi: item.jam,
+        teamOnly: item.onlyTeam ? "Ya" : "Tidak",
+        status: getStatus(item.tanggal_kegiatan),
+        tipe: item.onlyTeam ? "Team Only" : "Public",
+        team: "-"
+      }));
+      
+      console.log('JadwalList setelah transformasi:', jadwalList);
+    } else {
+      console.error('Gagal fetch data:', response.status);
+      jadwalList = [];
+    }
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    jadwalList = [];
+  } finally {
+    isLoading = false;
+  }
+}
+
+// Fungsi helper untuk format tanggal (contoh: 1 Januari 2025)
+function formatDate(dateString) {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  
+  const months = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+  
+  const day = date.getDate();
+  const month = months[date.getMonth()];
+  const year = date.getFullYear();
+  
+  return `${day} ${month} ${year}`;
+}
+  // Fungsi untuk menentukan status berdasarkan tanggal
+  function getStatus(dateString) {
+    if (!dateString) return "Upcoming";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const kegiatanDate = new Date(dateString);
+    kegiatanDate.setHours(0, 0, 0, 0);
+    
+    if (kegiatanDate < today) {
+      return "Selesai";
+    } else if (kegiatanDate.getTime() === today.getTime()) {
+      return "Hari Ini";
+    } else {
+      const diffTime = kegiatanDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return `In ${diffDays} days`;
+    }
+  }
+
+  async function handleSubmit() {
+    // Validasi field yang wajib diisi
+    if (!formData.namaAcara || !formData.tanggalAcara || !formData.lokasi) {
+      Swal.fire({ 
+        icon: "warning", 
+        title: "Lengkapi semua field!", 
+        text: "Nama Acara, Tanggal Acara, dan Jam Kegiatan wajib diisi.",
+        confirmButtonColor: "#0a4682" 
+      });
       return;
     }
-    jadwalList = [...jadwalList, {
-      event: formData.namaAcara,
-      team: formData.team,
-      waktu: formData.tanggalAcara,
-      lokasi: formData.lokasi,
-      tipe: formData.tipe,
-      status: "Upcoming"
-    }];
-    Swal.fire({ icon: "success", title: "Jadwal berhasil dibuat!", confirmButtonColor: "#0a4682" });
-    closeModal();
+
+    const payload = {
+      nama_kegiatan: formData.namaAcara,
+      tanggal_kegiatan: formData.tanggalAcara,
+      jam: formData.lokasi,
+      onlyTeam: formData.hanyaUntukTim || false
+    };
+
+    try {
+      Swal.fire({
+        title: "Menyimpan data...",
+        text: "Mohon tunggu sebentar",
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      const response = await fetch(`http://localhost:9999/api/kegiatan/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (response.status !== 200) {
+        Swal.fire({ 
+          icon: "error", 
+          title: "Gagal Membuat Kegiatan!", 
+          text: result.message || result.body || "Data tidak tersimpan di server.",
+          confirmButtonColor: "#0a4682" 
+        });
+        return;
+      }
+
+      Swal.fire({ 
+        icon: "success", 
+        title: "Jadwal berhasil dibuat!", 
+        text: result.message || "Data telah tersimpan di server.",
+        confirmButtonColor: "#0a4682" 
+      });
+      
+      closeModal();
+      
+      // Refresh data dari backend setelah submit
+      await fetchJadwalData();
+      
+    } catch (error) {
+      console.error('Error:', error);
+      Swal.fire({ 
+        icon: "error", 
+        title: "Gagal menyimpan jadwal!", 
+        text: error.message || "Terjadi kesalahan saat menghubungi server.",
+        confirmButtonColor: "#0a4682" 
+      });
+    }
   }
 
   let currentUserName = "Loading...";
@@ -55,8 +197,9 @@
     } else {
       push("/");
     }
-        if(localStorage.getItem("role") !== "admin"){
-    Swal.fire({
+    
+    if(localStorage.getItem("role") !== "admin"){
+      Swal.fire({
         icon: 'error',
         title: 'Unauthorized',
         text: 'Redirecting......',
@@ -64,7 +207,7 @@
       }).then(() => {
         push('/user/absensi');
       });
-  }
+    }
 
     const userStatus = localStorage.getItem("status");
     if(!userStatus){
@@ -78,8 +221,10 @@
       });
       return;
     }
+    
+    // Ambil data jadwal saat halaman dimuat
+    fetchJadwalData();
   });
-
 
   function handleLogout() {
     Swal.fire({
@@ -120,10 +265,9 @@
   function closeDropdown() {
     isDropdownOpen = false;
   }
-
-
 </script>
 
+<!-- HTML section - tambahkan loading state -->
 <svelte:window bind:innerWidth />
 
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">
@@ -301,13 +445,12 @@
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6">
           <div class="flex flex-col justify-center p-5 bg-white border border-gray-100 shadow-sm sm:p-6 rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
-
               <svg class="w-6 h-6"  viewBox="0 0 2048 2048">
                 <path fill="#46a46a" d="M1792 993q60 41 107 93t81 114t50 131t18 141q0 119-45 224t-124 183t-183 123t-224 46q-91 0-176-27t-156-78t-126-122t-85-157H128V128h256V0h128v128h896V0h128v128h256v865zM256 256v256h1408V256h-128v128h-128V256H512v128H384V256H256zm643 1280q-3-31-3-64q0-86 24-167t73-153h-97v-128h128v86q41-51 91-90t108-67t121-42t128-15q100 0 192 33V640H256v896h643zm573 384q93 0 174-35t142-96t96-142t36-175q0-93-35-174t-96-142t-142-96t-175-36q-93 0-174 35t-142 96t-96 142t-36 175q0 93 35 174t96 142t142 96t175 36zm64-512h192v128h-320v-384h128v256zM384 1024h128v128H384v-128zm256 0h128v128H640v-128zm0-256h128v128H640V768zm0 512h128v128H640v-128zm384-384H896V768h128v128zm256 0h-128V768h128v128zM384 768h128v128H384V768z"/>
               </svg>
             </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.jadwalTournament}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Jadwal Tournament</p>
+            <h3 class="text-4xl font-black text-gray-800">{jadwalList.length}</h3>
+            <p class="mt-1 text-sm font-medium text-gray-500">Total Jadwal</p>
           </div>
 
           <div class="flex flex-col justify-center p-5 bg-white border border-gray-100 shadow-sm sm:p-6 rounded-2xl">
@@ -316,8 +459,8 @@
                 <path fill="#46a46a" d="M1792 993q60 41 107 93t81 114t50 131t18 141q0 119-45 224t-124 183t-183 123t-224 46q-91 0-176-27t-156-78t-126-122t-85-157H128V128h256V0h128v128h896V0h128v128h256v865zM256 256v256h1408V256h-128v128h-128V256H512v128H384V256H256zm643 1280q-3-31-3-64q0-86 24-167t73-153h-97v-128h128v86q41-51 91-90t108-67t121-42t128-15q100 0 192 33V640H256v896h643zm573 384q93 0 174-35t142-96t96-142t36-175q0-93-35-174t-96-142t-142-96t-175-36q-93 0-174 35t-142 96t-96 142t-36 175q0 93 35 174t96 142t142 96t175 36zm64-512h192v128h-320v-384h128v256zM384 1024h128v128H384v-128zm256 0h128v128H640v-128zm0-256h128v128H640V768zm0 512h128v128H640v-128zm384-384H896V768h128v128zm256 0h-128V768h128v128zM384 768h128v128H384V768z"/>
               </svg>
             </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.jadwalScrim}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Jadwal Scrim</p>
+            <h3 class="text-4xl font-black text-gray-800">{jadwalList.filter(j => j.teamOnly === "Ya").length}</h3>
+            <p class="mt-1 text-sm font-medium text-gray-500">Team Only</p>
           </div>
 
           <div class="flex flex-col justify-center p-5 bg-white border border-gray-100 shadow-sm sm:p-6 rounded-2xl sm:col-span-2 lg:col-span-1">
@@ -326,8 +469,8 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.jumlahTeam}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Jumlah Team</p>
+            <h3 class="text-4xl font-black text-gray-800">{jadwalList.filter(j => j.teamOnly === "Tidak").length}</h3>
+            <p class="mt-1 text-sm font-medium text-gray-500">Public</p>
           </div>
         </div>
 
@@ -345,52 +488,69 @@
           </button>
           </div>
 
-          <div class="hidden overflow-x-auto sm:block max-h-[400px]">
-            <table class="w-full text-left border-collapse">
-              <thead class="sticky top-0 z-10 bg-gray-50 outline outline-1 outline-gray-100">
-                <tr class="text-sm text-gray-500 border-b border-gray-100 bg-gray-50">
-                  <th class="px-6 py-4 font-semibold">Event</th>
-                  <th class="px-6 py-4 font-semibold">Team</th>
-                  <th class="px-6 py-4 font-semibold">Waktu</th>
-                  <th class="px-6 py-4 font-semibold">Lokasi</th>
-                  <th class="px-6 py-4 font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody class="text-sm text-gray-700">
-                {#each jadwalList as jadwal}
-                  <tr class="transition-colors border-b border-gray-50 hover:bg-gray-50/50">
-                    <td class="px-6 py-4 font-medium text-gray-900">{jadwal.event}</td>
-                    <td class="px-6 py-4 whitespace-pre-line">{jadwal.team}</td>
-                    <td class="px-6 py-4">{jadwal.waktu}</td>
-                    <td class="px-6 py-4">{jadwal.lokasi}</td>
-                    <td class="px-6 py-4">
-                      <span class="inline-flex items-center px-3 py-1 text-xs font-bold rounded-full {jadwal.status === 'Selesai' ? 'bg-gray-200 text-gray-600' : jadwal.status === 'Upcoming' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}">
-                        {jadwal.status}
-                      </span>
-                    </td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-
-          <div class="block space-y-3 sm:hidden p-4">
-            {#each jadwalList as jadwal}
-              <div class="p-4 border border-gray-100 rounded-xl bg-gray-50/50">
-                <div class="flex items-start justify-between mb-2">
-                  <h4 class="text-sm font-bold text-gray-900">{jadwal.event}</h4>
-                  <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-full {jadwal.status === 'Selesai' ? 'bg-gray-200 text-gray-600' : jadwal.status === 'Upcoming' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}">
-                    {jadwal.status}
-                  </span>
-                </div>
-                <div class="space-y-1 text-xs text-gray-600">
-                  <p><span class="font-semibold">Team:</span> {jadwal.team}</p>
-                  <p><span class="font-semibold">Waktu:</span> {jadwal.waktu}</p>
-                  <p><span class="font-semibold">Lokasi:</span> {jadwal.lokasi}</p>
-                </div>
+          {#if isLoading}
+            <div class="flex justify-center items-center p-8">
+              <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#0a4682]"></div>
+                <p class="mt-2 text-gray-500">Memuat data...</p>
               </div>
-            {/each}
-          </div>
+            </div>
+          {:else if jadwalList.length === 0}
+            <div class="text-center p-8 text-gray-500">
+              <p>Belum ada jadwal</p>
+            </div>
+          {:else}
+            <div class="hidden overflow-x-auto sm:block max-h-[400px]">
+              <table class="w-full text-left border-collapse">
+                <thead class="sticky top-0 z-10 bg-gray-50 outline outline-1 outline-gray-100">
+                  <tr class="text-sm text-gray-500 border-b border-gray-100 bg-gray-50">
+                    <th class="px-6 py-4 font-semibold">Event</th>
+                    <th class="px-6 py-4 font-semibold">Waktu</th>
+                    <th class="px-6 py-4 font-semibold">Jam</th>
+                    <th class="px-6 py-4 font-semibold">Team Only</th>
+                    <th class="px-6 py-4 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="text-sm text-gray-700">
+                  {#each jadwalList as jadwal}
+                    <tr class="transition-colors border-b border-gray-50 hover:bg-gray-50/50">
+                      <td class="px-6 py-4 font-medium text-gray-900">{jadwal.event}</td>
+                      <td class="px-6 py-4">{jadwal.waktu}</td>
+                      <td class="px-6 py-4">{jadwal.lokasi}</td>
+                      <td class="px-6 py-4">
+                        <span class="inline-flex items-center px-2 py-1 text-xs font-bold rounded-full {jadwal.teamOnly === 'Ya' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}">
+                          {jadwal.teamOnly}
+                        </span>
+                      </td>
+                      <td class="px-6 py-4">
+                        <span class="inline-flex items-center px-3 py-1 text-xs font-bold rounded-full {jadwal.status === 'Selesai' ? 'bg-gray-200 text-gray-600' : jadwal.status === 'Hari Ini' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}">
+                          {jadwal.status}
+                        </span>
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="block space-y-3 sm:hidden p-4">
+              {#each jadwalList as jadwal}
+                <div class="p-4 border border-gray-100 rounded-xl bg-gray-50/50">
+                  <div class="flex items-start justify-between mb-2">
+                    <h4 class="text-sm font-bold text-gray-900">{jadwal.event}</h4>
+                    <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-full {jadwal.status === 'Selesai' ? 'bg-gray-200 text-gray-600' : jadwal.status === 'Hari Ini' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}">
+                      {jadwal.status}
+                    </span>
+                  </div>
+                  <div class="space-y-1 text-xs text-gray-600">
+                    <p><span class="font-semibold">Waktu:</span> {jadwal.waktu}</p>
+                    <p><span class="font-semibold">Jam:</span> {jadwal.lokasi}</p>
+                    <p><span class="font-semibold">Team Only:</span> {jadwal.teamOnly}</p>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {/if}
         </div>
         
       </div>
@@ -442,44 +602,27 @@
           </div>
 
           <div>
-            <label for="lokasi" class="block mb-1.5 text-sm font-semibold text-gray-700">Lokasi</label>
+            <label for="Jam" class="block mb-1.5 text-sm font-semibold text-gray-700">Jam Kegiatan</label>
             <input
-              id="lokasi"
-              type="text"
+              id="Jam"
+              type="time"
               bind:value={formData.lokasi}
               class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-              placeholder="Masukkan lokasi"
+              placeholder="Masukkan Jam"
             />
           </div>
 
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label for="team" class="block mb-1.5 text-sm font-semibold text-gray-700">Team</label>
-              <select
-                id="team"
-                bind:value={formData.team}
-                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white appearance-none cursor-pointer"
-              >
-                <option value="" disabled selected>Pilih Team</option>
-                {#each teamOptions as team}
-                  <option value={team}>{team}</option>
-                {/each}
-              </select>
-            </div>
-
-            <div>
-              <label for="tipe" class="block mb-1.5 text-sm font-semibold text-gray-700">Tipe</label>
-              <select
-                id="tipe"
-                bind:value={formData.tipe}
-                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white appearance-none cursor-pointer"
-              >
-                <option value="" disabled selected>Pilih Tipe</option>
-                {#each tipeOptions as tipe}
-                  <option value={tipe}>{tipe}</option>
-                {/each}
-              </select>
-            </div>
+          <!-- Checkbox untuk "Hanya untuk yang memiliki tim?" -->
+          <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <input
+              type="checkbox"
+              id="hanyaUntukTim"
+              bind:checked={formData.hanyaUntukTim}
+              class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+            />
+            <label for="hanyaUntukTim" class="text-sm font-semibold text-gray-700 cursor-pointer">
+              Hanya untuk yang memiliki tim?
+            </label>
           </div>
         </div>
 
@@ -500,4 +643,4 @@
       </div>
     </div>
   {/if}
-</div> 
+</div>

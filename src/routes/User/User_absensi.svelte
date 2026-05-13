@@ -417,7 +417,7 @@
     }
 
     const userStatus = localStorage.getItem("status");
-    if(!userStatus){
+    if(userStatus === "false"){
       Swal.fire({
         icon: 'warning',
         title: 'Belum Verifikasi',
