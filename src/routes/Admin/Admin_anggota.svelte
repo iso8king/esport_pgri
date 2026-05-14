@@ -7,42 +7,49 @@
 
 
   let anggotaList = [
-    { nama: "Ahmad Jack", team: "Team A", role: "Captain", position: "Mid Laner", status: "Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Player", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "Active" },
-    { nama: "Ahmad Jack", team: "Team A", role: "Player", position: "Mid Laner", status: "Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Coach", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "In-Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Player", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "Active" },
-    { nama: "Ahmad Jack", team: "Team A", role: "Player", position: "Mid Laner", status: "Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Coach", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "In-Active" },
+    { nama: "Ahmad Jack", team: "Team A", position: "Mid Laner", status: "Dalam Tim" },
+    { nama: "Udin Petot", team: "Team B", position: "Gold Laner", status: "Dalam Tim" },
+    { nama: "Siti Pro", team: "Team A", position: "Jungler", status: "Dalam Tim" },
+    { nama: "Bambang back", team: "No Team", position: "Roamer", status: "Tidak Dalam Tim" },
+    { nama: "Ahmad Jack", team: "Team A", position: "Exp Laner", status: "Dalam Tim" },
+    { nama: "Udin Petot", team: "Team B", position: "Gold Laner", status: "Dalam Tim" },
+    { nama: "Siti Pro", team: "Team A" , position: "Jungler", status: "Dalam Tim" },
+    { nama: "Bambang back", team: "No Team", position: "Roamer", status: "Tidak Dalam Tim" },
+    { nama: "Udin Petot", team: "Team B", position: "Exp Laner", status: "Dalam Tim" },
+    { nama: "Siti Pro", team: "Team A", position: "Jungler", status: "Dalam Tim" },
+    { nama: "Bambang back", team: "No Team", position: "Roamer", status: "Tidak Dalam Tim" },
+    { nama: "Ahmad Jack", team: "Team A", position: "Exp Laner", status: "Dalam Tim" },
+    { nama: "Udin Petot", team: "Team B", position: "Gold Laner", status: "Dalam Tim" },
+    { nama: "Siti Pro", team: "Team A", position: "Jungler", status: "Dalam Tim" },
+    { nama: "Bambang back", team: "No Team", position: "Roamer", status: "Tidak Dalam Tim" },
   ];
 
   $: statistik = {
     totalanggota: anggotaList.length,
 
-    playerAktif: anggotaList.filter(
-      (orang) => (orang.role === "Player" || orang.role === "Captain") && orang.status === "Active"
+    playerDalamTeam: anggotaList.filter(
+      (orang) => (orang.position === "Mid Laner" || orang.position === "Gold Laner" 
+      || orang.position === "Jungler" || orang.position === "Roamer" || orang.position === "Exp Laner") && orang.status === "Dalam Tim"
     ).length,
 
-    playerInAktif: anggotaList.filter(
-      (orang) => (orang.role === "Player" || orang.role === "Captain") && orang.status === "In-Active"
-    ).length,
-
-    coachAktif: anggotaList.filter(
-      (orang) => orang.role === "Coach" && orang.status === "Active"
+    playerTidakDalamTeam: anggotaList.filter(
+      (orang) => (orang.position === "Mid Laner" || orang.position === "Gold Laner" 
+      || orang.position === "Jungler" || orang.position === "Roamer" || orang.position === "Exp Laner") && orang.status === "Tidak Dalam Tim"
     ).length,
 
     teamAktif: [...new Set(anggotaList.map((orang) => orang.team))].filter(
       (namaTim) => namaTim !== "No Team"
     ).length,
   };
+  let searchQuery = '';
+
+
+$: filterAnggotaList = anggotaList.filter((orang) => {
+
+    const matchName = orang.nama.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return  matchName;
+});
 
   let currentUserName = "Loading...";
 
@@ -120,11 +127,7 @@
     isDropdownOpen = false;
   }
 
-  let FilterRole = "Semua";
 
-  $: filterAnggotaList = FilterRole === "Semua"
-    ? anggotaList
-    : anggotaList.filter((orang) => orang.role === FilterRole);
 
   let isModalOpen = false;
   let namaTeam = "";
@@ -188,7 +191,7 @@
   }
 
   function submitEditAnggota() {
-    if (!formData.nama || !formData.team || !formData.role || !formData.position) {
+    if (!formData.nama || !formData.team || !formData.position) {
       Swal.fire({
         icon: "warning",
         title: "Data Belum Lengkap",
@@ -212,6 +215,8 @@
       showConfirmButton: false,
     });
   }
+
+  
 </script>
 
 <svelte:window bind:innerWidth />
@@ -384,15 +389,15 @@
     <main class="flex-1 p-10 overflow-x-hidden overflow-y-auto bg-gray-50">
       <div class="max-w-full mx-auto space-y-7">
         
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
+        <div class="grid grid-cols-1 gap-9 md:grid-cols-3">
           <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
               <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.playerAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Player Aktif</p>
+            <h3 class="text-4xl font-black text-gray-800">{statistik.playerDalamTeam}</h3>
+            <p class="mt-1 text-sm font-medium text-gray-500">Player Dalam Tim</p>
           </div>
 
           <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
@@ -401,19 +406,10 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.playerInAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Player In-Aktif</p>
+            <h3 class="text-4xl font-black text-gray-800">{statistik.playerTidakDalamTeam}</h3>
+            <p class="mt-1 text-sm font-medium text-gray-500">Player Tidak Dalam Tim</p>
           </div>
 
-          <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.coachAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Coach Aktif</p>
-          </div>
 
           <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
@@ -427,28 +423,24 @@
         </div>
 
         <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-          <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6 py-5 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-800">Anggota</h3>
-
-            <div class="flex items-center gap-4">
-            <button
-            on:click={openModal}
-            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] hover:shadow-lg active:scale-95"
-          >
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Buat Team
-          </button>
-            <select
-              bind:value={FilterRole}
-              class="px-4 py-2.5 text-sm font-bold text-gray-700 transition-colors bg-gray-50 border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0a2e52] cursor-pointer"
-            >
-              <option value="Semua">Semua Role</option>
-              <option value="Captain">Captain</option>
-              <option value="Player">Player</option>
-              <option value="Coach">Coach</option>
-            </select>
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center w-full md:w-auto gap-4">
+              <input 
+                type="text" 
+                bind:value={searchQuery} 
+                placeholder="Cari nama anggota..." 
+                class="border rounded-md px-3 py-2 w-full sm:w-64 focus:outline-none focus:border-blue-500"
+              />
+              <button
+                on:click={openModal}
+                class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white whitespace-nowrap transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] hover:shadow-lg active:scale-95 w-full sm:w-auto"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Buat Team
+              </button>
             </div>
           </div>
 
@@ -456,32 +448,35 @@
             <table class="w-full text-left border-collapse">
               <thead class="sticky top-0 z-10 outline outline-1 outline-gray-100 bg-gray-50">
                 <tr class="text-sm text-gray-500 border-b border-gray-100 bg-gray-50">
-                  <th class="px-6 py-4 font-semibold">Nama</th>
-                  <th class="px-6 py-4 font-semibold">Team</th>
-                  <th class="px-6 py-4 font-semibold">Role</th>
-                  <th class="px-6 py-4 font-semibold">Position</th>
-                  <th class="px-6 py-4 font-semibold">Status</th>
-                  <th class="px-6 py-4 font-semibold text-center">Edit</th>
+                  <th class="px-6 py-4 font-semibold whitespace-nowrap">Nama</th>
+                  <th class="px-6 py-4 font-semibold whitespace-nowrap">Team</th>
+                  <th class="px-6 py-4 font-semibold whitespace-nowrap">Role</th>
+                  <th class="px-6 py-4 font-semibold whitespace-nowrap">Status</th>
+                  <th class="px-6 py-4 font-semibold text-center whitespace-nowrap">Edit</th>
                 </tr>
               </thead>
               <tbody class="text-sm text-gray-700">
                 {#each filterAnggotaList as orang}
                   <tr class="transition-colors border-b border-gray-50 hover:bg-gray-50/50">
-                    <td class="px-6 py-4 font-medium text-gray-900">{orang.nama}</td>
-                    <td class="px-6 py-4">{orang.team}</td>
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{orang.nama}</td>
+                    
+                    <td class="px-6 py-4 whitespace-nowrap">{orang.team}</td>
+                    
+                    <td class="px-6 py-4 whitespace-nowrap">
                       <span class="px-3 py-1 text-xs font-bold text-blue-800 bg-blue-100 rounded-full">
-                        {orang.role}
+                        {orang.position}
                       </span>
                     </td>
-                    <td class="px-6 py-4">{orang.position}</td>
-                    <td class="px-6 py-4">
+                    
+                    <td class="px-6 py-4 whitespace-nowrap">
                       <div class="flex items-center gap-2">
-                        <span class={`w-2 h-2 rounded-full ${orang.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                        {orang.status}
+                        <span class={`w-2 h-2 rounded-full ${orang.team !== 'No Team' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                        
+                        {orang.team !== 'No Team' ? 'Dalam Tim' : 'Tidak Dalam Tim'}
                       </div>
                     </td>
-                    <td class="px-6 py-4 text-center">
+                    
+                    <td class="px-6 py-4 text-center whitespace-nowrap">
                       <button
                         on:click={() => openEditModal(orang)}
                         class="p-2 text-blue-600 transition-colors rounded-md hover:bg-blue-50"
@@ -494,10 +489,17 @@
                     </td>
                   </tr>
                 {/each}
+                
+                {#if filterAnggotaList.length === 0}
+                  <tr>
+                    <td colspan="5" class="py-8 text-center text-gray-400 whitespace-nowrap">
+                      Tidak ada anggota yang cocok dengan pencarian.
+                    </td>
+                  </tr>
+                {/if}
               </tbody>
             </table>
           </div>
-        </div>
         
       </div>
     </main>
@@ -608,49 +610,15 @@
             Pilih Role
           </label>
           <select
-            bind:value={formData.role}
-            class="w-full pt-6 pb-2 pl-4 pr-10 text-sm font-bold text-gray-800 transition-all duration-200 bg-white border border-gray-200 rounded-xl shadow-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0a2e52]/20 focus:border-[#0a2e52]"
-          >
-            <option value="" disabled selected>Pilih Role</option>
-            <option value="Captain">Captain</option>
-            <option value="Player">Player</option>
-            <option value="Coach">Coach</option>
-          </select>
-          <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-400">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-          </div>
-        </div>
-
-        <div class="relative group">
-          <label class="absolute z-10 font-bold text-gray-700 transition-all duration-200 left-4 top-2 text-[11px] pointer-events-none">
-            Pilih Position
-          </label>
-          <select
             bind:value={formData.position}
             class="w-full pt-6 pb-2 pl-4 pr-10 text-sm font-bold text-gray-800 transition-all duration-200 bg-white border border-gray-200 rounded-xl shadow-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0a2e52]/20 focus:border-[#0a2e52]"
           >
-            <option value="" disabled selected>Pilih Position</option>
+            <option value="" disabled selected>Pilih Role</option>
             <option value="Mid Laner">Mid Laner</option>
             <option value="Gold Laner">Gold Laner</option>
             <option value="Exp Laner">Exp Laner</option>
             <option value="Jungler">Jungler</option>
             <option value="Roamer">Roamer</option>
-          </select>
-          <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-400">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-          </div>
-        </div>
-
-        <div class="relative group">
-          <label class="absolute z-10 font-bold text-gray-700 transition-all duration-200 left-4 top-2 text-[11px] pointer-events-none">
-            Status
-          </label>
-          <select
-            bind:value={formData.status}
-            class="w-full pt-6 pb-2 pl-4 pr-10 text-sm font-bold text-gray-800 transition-all duration-200 bg-white border border-gray-200 rounded-xl shadow-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0a2e52]/20 focus:border-[#0a2e52]"
-          >
-            <option value="Active">Active</option>
-            <option value="In-Active">In-Active</option>
           </select>
           <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-400">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>

@@ -16,40 +16,49 @@
 
 
   let anggotaList = [
-    { nama: "Ahmad Jack", team: "Team A", role: "Captain", position: "Mid Laner", status: "Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Player", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "Active" },
-    { nama: "Ahmad Jack", team: "Team A", role: "Player", position: "Mid Laner", status: "Active" },
-    { nama: "Udin Petot", team: "Team B", role: "Player", position: "Gold Laner", status: "Active" },
-    { nama: "Siti Pro", team: "Team A", role: "Coach", position: "Jungler", status: "Active" },
-    { nama: "Bambang back", team: "No Team", role: "Player", position: "Roamer", status: "In-Active" },
+    { nama: "Ahmad Jack", team: "Team A", position: "Mid Laner", status: "Dalam Tim" },
+    { nama: "Udin Petot", team: "Team B", position: "Gold Laner", status: "Dalam Tim" },
+    { nama: "Siti Pro", team: "Team A", position: "Jungler", status: "Dalam Tim" },
+    { nama: "Bambang back", team: "No Team", position: "Roamer", status: "Tidak Dalam Tim" },
+    { nama: "Ahmad Jack", team: "Team A", position: "Exp Laner", status: "Dalam Tim" },
+    { nama: "Udin Petot", team: "Team B", position: "Gold Laner", status: "Dalam Tim" },
+    { nama: "Siti Pro", team: "Team A" , position: "Jungler", status: "Dalam Tim" },
+    { nama: "Bambang back", team: "No Team", position: "Roamer", status: "Tidak Dalam Tim" },
+    { nama: "Udin Petot", team: "Team B", position: "Exp Laner", status: "Dalam Tim" },
+    { nama: "Siti Pro", team: "Team A", position: "Jungler", status: "Dalam Tim" },
+    { nama: "Bambang back", team: "No Team", position: "Roamer", status: "Tidak Dalam Tim" },
+    { nama: "Ahmad Jack", team: "Team A", position: "Exp Laner", status: "Dalam Tim" },
+    { nama: "Udin Petot", team: "Team B", position: "Gold Laner", status: "Dalam Tim" },
+    { nama: "Siti Pro", team: "Team A", position: "Jungler", status: "Dalam Tim" },
+    { nama: "Bambang back", team: "No Team", position: "Roamer", status: "Tidak Dalam Tim" },
   ];
 
   $: statistik = {
-    totalanggota : anggotaList.length,
+    totalanggota: anggotaList.length,
 
-      playerAktif: anggotaList.filter(
-      orang => (orang.role === "Player" || orang.role === "Captain") && orang.status === "Active"
+    playerDalamTeam: anggotaList.filter(
+      (orang) => (orang.position === "Mid Laner" || orang.position === "Gold Laner" 
+      || orang.position === "Jungler" || orang.position === "Roamer" || orang.position === "Exp Laner") && orang.status === "Dalam Tim"
     ).length,
 
-    playerInAktif: anggotaList.filter(
-      orang => (orang.role === "Player" || orang.role === "Captain") && orang.status === "In-Active"
-    ).length,
-    
-    coachAktif: anggotaList.filter(
-      orang => orang.role === "Coach" && orang.status === "Active"
+    playerTidakDalamTeam: anggotaList.filter(
+      (orang) => (orang.position === "Mid Laner" || orang.position === "Gold Laner" 
+      || orang.position === "Jungler" || orang.position === "Roamer" || orang.position === "Exp Laner") && orang.status === "Tidak Dalam Tim"
     ).length,
 
-    teamAktif: [...new Set(anggotaList.map(orang => orang.team))]
-      .filter(namaTim => namaTim !== "No Team").length
+    teamAktif: [...new Set(anggotaList.map((orang) => orang.team))].filter(
+      (namaTim) => namaTim !== "No Team"
+    ).length,
   };
 
-  const urutanRole = {
-    "Coach": 1,
-    "Captain": 2,
-    "Player": 3
-  };
+  let FilterPosition = "Semua";
+
+  $: filterAnggotaList = anggotaList.filter((orang) => {
+    const matchPosition = FilterPosition === "Semua" || orang.position === FilterPosition;
+    return matchPosition;
+  });
+
+
   $: Datatim = anggotaList.reduce((hasil, anggota) =>{
   let cektim = hasil.find(team => team.name === anggota.team);
   if(!cektim) {
@@ -61,18 +70,14 @@
   }
   cektim.members.push({
     name: anggota.nama,
-    role: anggota.role,
+    position: anggota.position,
   });
   return hasil;
-}, []).map(team => {
-    team.members.sort((a, b) => {
-      
-      let nilaiA = urutanRole[a.role] || 99;
-      let nilaiB = urutanRole[b.role] || 99;
-      
-      return nilaiA - nilaiB;
-    });
-
+},
+[]).filter(team => team.name !== "No Team").map(team => {
+  team.members.sort((a, b) => {
+    return a.name.localeCompare(b.name);
+  });
   return team;
 });
 
@@ -327,36 +332,27 @@
           <div class="absolute w-64 h-64 bg-white rounded-full opacity-5 -right-10 -top-20 blur-2xl pointer-events-none"></div>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
+        <div class="grid grid-cols-1 gap-9 md:grid-cols-3">
           <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
               <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.playerAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Player Aktif</p>
+            <h3 class="text-4xl font-black text-gray-800">{statistik.playerDalamTeam}</h3>
+            <p class="mt-1 text-sm font-medium text-gray-500">Player Dalam Tim</p>
           </div>
-          
+
           <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-red-700 bg-red-100 rounded-xl">
               <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.playerInAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Player In-Aktif</p>
+            <h3 class="text-4xl font-black text-gray-800">{statistik.playerTidakDalamTeam}</h3>
+            <p class="mt-1 text-sm font-medium text-gray-500">Player Tidak Dalam Tim</p>
           </div>
 
-          <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
-            <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
-              <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <h3 class="text-4xl font-black text-gray-800">{statistik.coachAktif}</h3>
-            <p class="mt-1 text-sm font-medium text-gray-500">Coach Aktif</p>
-          </div>
 
           <div class="flex flex-col justify-center p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
@@ -370,36 +366,59 @@
         </div>
 
         <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
-          <div class="px-6 py-5 border-b border-gray-100">
+          <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100">
             <h3 class="text-lg font-bold text-gray-800">Anggota</h3>
+            <div class="flex items-center gap-4">
+              <select
+              bind:value={FilterPosition}
+              class="px-4 py-2.5 text-sm font-bold text-gray-700 transition-colors bg-gray-50 border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0a2e52] cursor-pointer"
+            >
+              <option value="Semua">Semua Role</option>
+              <option value="Mid Laner">Mid Laner</option>
+              <option value="Gold Laner">Gold Laner</option>
+              <option value="Jungler">Jungler</option>
+              <option value="Roamer">Roamer</option>
+              <option value="Exp Laner">Exp Laner</option>
+            </select>
+            </div>
           </div>
 
           <div class="overflow-x-auto max-h-[400px]">
             <table class="w-full text-left border-collapse ">
               <thead class="sticky top-0 z-10 bg-gray-50 outline outline-1 outline-gray-100">
                 <tr class="text-sm text-gray-500 border-b border-gray-100 bg-gray-50">
-                  <th class="px-6 py-4 font-semibold">Nama</th>
-                  <th class="px-6 py-4 font-semibold">Team</th>
-                  <th class="px-6 py-4 font-semibold">Role</th>
-                  <th class="px-6 py-4 font-semibold">Position</th>
-                  <th class="px-6 py-4 font-semibold">Status</th>
+                  <th class="px-6 py-4 font-semibold whitespace-nowrap">Nama</th>
+                  <th class="px-6 py-4 font-semibold whitespace-nowrap">Team</th>
+                  <th class="px-6 py-4 font-semibold whitespace-nowrap">Role</th>
+                  <th class="px-6 py-4 font-semibold whitespace-nowrap">Status</th>
                 </tr>
               </thead>
               <tbody class="text-sm text-gray-700">
-                {#each anggotaList as orang}
+                {#each filterAnggotaList as orang}
                   <tr class="transition-colors border-b border-gray-50 hover:bg-gray-50/50">
                     <td class="px-6 py-4 font-medium text-gray-900">{orang.nama}</td>
-                    <td class="px-6 py-4">{orang.team}</td>
-                    <td class="px-6 py-4">{orang.role}</td>
-                    <td class="px-6 py-4">{orang.position}</td>
-                    <td class="px-6 py-4">
+                    <td class="px-6 py-4 whitespace-nowrap">{orang.team}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <span class="px-3 py-1 text-xs font-bold text-blue-800 bg-blue-100 rounded-full">
+                        {orang.position}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
                       <div class="flex items-center gap-2">
-                        <span class={`w-2 h-2 rounded-full ${orang.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                        {orang.status}
+                        <span class={`w-2 h-2 rounded-full ${orang.team !== 'No Team' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                        {orang.team !== 'No Team' ? 'Dalam Tim' : 'Tidak Dalam Tim'}
                       </div>
                     </td>
                   </tr>
                 {/each}
+                
+                {#if filterAnggotaList.length === 0}
+                    <tr>
+                      <td colspan="5" class="py-8 text-center text-gray-400 whitespace-nowrap">
+                        Tidak ada anggota yang cocok dengan filter.
+                      </td>
+                    </tr>
+                {/if}
               </tbody>
             </table>
           </div>
@@ -455,7 +474,7 @@
                   {#each team.members as member}
                     <div class="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
                       <span class="pl-2 text-sm font-medium text-gray-600">{member.name}</span>
-                      <span class="pr-2 text-sm font-bold text-gray-800">{member.role}</span>
+                      <span class="pr-2 text-sm font-bold text-gray-800">{member.position}</span>
                     </div>
                   {/each}
                 </div>
