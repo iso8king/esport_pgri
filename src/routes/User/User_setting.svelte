@@ -39,6 +39,7 @@
       profile.email = localStorage.getItem("email") || "";
       profile.game_id = localStorage.getItem("user_game_id") || "";
       profile.server_id = localStorage.getItem("user_server_id") || "";
+      profile.team = localStorage.getItem("tim") || "";
     } else {
       push("/");
     }
@@ -411,7 +412,9 @@
     Swal.fire({
       title: "Yakin ingin keluar?", icon: "warning", showCancelButton: true,
       confirmButtonColor: "#ef4444", cancelButtonColor: "#9ca3af", confirmButtonText: "Ya, Logout!",
-    }).then((r) => { if (r.isConfirmed) { localStorage.removeItem("user_name"); localStorage.removeItem("user_role"); localStorage.removeItem("email"); localStorage.removeItem("user_game_id"); localStorage.removeItem("user_server_id"); push("/SignIn"); } });
+    }).then((r) => { if (r.isConfirmed) {
+      localStorage.clear();
+    } });
   }
 
   let innerWidth = 0;

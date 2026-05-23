@@ -14,6 +14,12 @@
 
   // State untuk menyimpan data absen (id, createdAt)
   let absenDataMap = new Map(); // { kegiatan_id: { createdAt, deskripsi, mood, bukti_url } }
+  
+  // State untuk tim user
+  let userTeam = null;
+  
+  // State untuk tanggal akun dibuat
+  let akunDibuat = null;
 
   // Detail modal (untuk yang sudah absen)
   let isDetailOpen = false;
@@ -28,6 +34,41 @@
   let isDragOver = false;
   let uploadedFileName = "";
   let uploadedFileSize = "";
+
+  // Ambil tim user dari localStorage
+  function getUserTeam() {
+    try {
+      const userTeamStr = localStorage.getItem("tim");
+      if (userTeamStr !== "null" && userTeamStr !== "undefined") {
+        userTeam = userTeamStr;
+        console.log("User team:", userTeam);
+      } else {
+        userTeam = null;
+        console.log("User tidak memiliki tim");
+      }
+    } catch (error) {
+      console.error("Error getting user team:", error);
+      userTeam = null;
+    }
+  }
+
+  // Ambil tanggal akun dibuat dari localStorage
+  function getAkunDibuat() {
+    try {
+      const akunDibuatStr = localStorage.getItem("akun_dibuat");
+      if (akunDibuatStr && akunDibuatStr !== "null" && akunDibuatStr !== "undefined") {
+        akunDibuat = new Date(akunDibuatStr);
+        akunDibuat.setHours(0, 0, 0, 0);
+        console.log("Akun dibuat pada:", akunDibuat);
+      } else {
+        akunDibuat = null;
+        console.log("Tidak ada data akun_dibuat");
+      }
+    } catch (error) {
+      console.error("Error getting akun_dibuat:", error);
+      akunDibuat = null;
+    }
+  }
 
   // Format tanggal ke format Indonesia
   function formatTanggal(dateString) {
@@ -50,6 +91,28 @@
     });
   }
 
+  // Cek apakah hari ini sama dengan tanggal kegiatan
+  function isSameDay(kegiatanTanggal) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const kegiatanDate = new Date(kegiatanTanggal);
+    kegiatanDate.setHours(0, 0, 0, 0);
+    
+    return today.getTime() === kegiatanDate.getTime();
+  }
+
+  // Cek apakah kegiatan setelah akun dibuat
+  function isAfterAkunDibuat(kegiatanTanggal) {
+    if (!akunDibuat) return true; // Jika tidak ada data, tampilkan semua
+    
+    const kegiatanDate = new Date(kegiatanTanggal);
+    kegiatanDate.setHours(0, 0, 0, 0);
+    
+    // Kegiatan hanya ditampilkan jika tanggalnya >= tanggal akun dibuat
+    return kegiatanDate.getTime() >= akunDibuat.getTime();
+  }
+
   // Ambil daftar kegiatan yang sudah di-absen (dengan createdAt)
   async function fetchSudahAbsenData() {
     try {
@@ -69,9 +132,7 @@
 
       const result = await response.json();
       
-      // Response: { data: [{ kegiatan_id: "id1", createdAt: "2026-04-24T16:59:39.021Z" }] }
       if (result.data && Array.isArray(result.data)) {
-        // Simpan ke Map untuk akses cepat
         absenDataMap.clear();
         result.data.forEach(item => {
           absenDataMap.set(item.kegiatan_id, {
@@ -109,7 +170,6 @@
         return;
       }
 
-      // Panggil API dengan parameter user_id
       const response = await fetch(`http://localhost:9999/api/kegiatan?user_id=${userId}&page=${page}`, {
         method: 'GET',
         headers: {
@@ -130,21 +190,43 @@
         totalItems = paging.totalItems;
         totalPage = paging.totalPage;
         
-        // Map data kegiatan dan tentukan status sudahAbsen berdasarkan absenDataMap
-        kegiatanList = result.data.data.map(kegiatan => {
+        // Filter kegiatan berdasarkan:
+        // 1. onlyTeam dan tim user
+        // 2. Tanggal kegiatan >= tanggal akun dibuat
+        let filteredData = result.data.data.filter(kegiatan => {
+          // Filter berdasarkan onlyTeam
+          if (kegiatan.onlyTeam === true) {
+            if (userTeam === null || userTeam === undefined || userTeam === "null") {
+              return false;
+            }
+          }
+          
+          // Filter berdasarkan tanggal akun dibuat
+          if (!isAfterAkunDibuat(kegiatan.tanggal_kegiatan)) {
+            return false;
+          }
+          
+          return true;
+        });
+        
+        // Map data kegiatan
+        kegiatanList = filteredData.map(kegiatan => {
           const absenData = absenDataMap.get(kegiatan.id);
           const sudahAbsen = !!absenData;
+          const isToday = isSameDay(kegiatan.tanggal_kegiatan);
           
           return {
             id: kegiatan.id,
-            minggu: kegiatan.nama_kegiatan ? kegiatan.nama_kegiatan.split(' - ')[0] : "Week",
-            judul: kegiatan.nama_kegiatan ? kegiatan.nama_kegiatan.split(' - ')[1] : kegiatan.nama_kegiatan,
+            nama: kegiatan.nama_kegiatan,
             tanggal: formatTanggal(kegiatan.tanggal_kegiatan),
+            tanggalRaw: kegiatan.tanggal_kegiatan,
             waktu: kegiatan.jam || "-",
+            onlyTeam: kegiatan.onlyTeam || false,
             status: sudahAbsen ? "Hadir" : "-",
             statusTanggal: sudahAbsen ? formatTanggal(absenData.createdAt) : "-",
             statusWaktu: sudahAbsen ? formatWaktu(absenData.createdAt) : "-",
             sudahAbsen: sudahAbsen,
+            isButtonDisabled: sudahAbsen || !isToday,
             pelajaran: sudahAbsen ? (absenData.deskripsi || null) : null,
             mood: sudahAbsen ? (absenData.mood || null) : null,
             bukti_url: sudahAbsen ? (absenData.bukti_url || null) : null,
@@ -154,6 +236,8 @@
       } else {
         kegiatanList = [];
       }
+      
+      console.log('Kegiatan setelah filter:', kegiatanList.length);
       
     } catch (error) {
       console.error('Error fetching kegiatan:', error);
@@ -215,6 +299,17 @@
   }
 
   function openAbsenModal(k) {
+    // Validasi tambahan: cek apakah hari ini sama dengan tanggal kegiatan
+    if (!isSameDay(k.tanggalRaw)) {
+      Swal.fire({
+        icon: "error",
+        title: "Tidak Bisa Absen",
+        text: "Absen hanya bisa dilakukan pada hari pelaksanaan kegiatan!",
+        confirmButtonColor: "#ef4444"
+      });
+      return;
+    }
+    
     selectedAbsen = k;
     formAbsen = { pelajaran: "", bukti: null, mood: "" };
     uploadedFileName = "";
@@ -243,14 +338,14 @@
 
   // Handle file upload
   function handleFileUpload(file) {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'application/pdf'];
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    const maxSize = 2 * 1024 * 1024; // 2MB
     
     if (!allowedTypes.includes(file.type) && !file.type.startsWith('image/')) {
       Swal.fire({
         icon: "error",
         title: "Format Tidak Didukung",
-        text: "Silakan upload file JPG, PNG, WEBP, atau PDF"
+        text: "Silakan upload file JPG atau PNG"
       });
       return false;
     }
@@ -259,7 +354,7 @@
       Swal.fire({
         icon: "error",
         title: "Ukuran Terlalu Besar",
-        text: "Maksimal ukuran file adalah 10MB"
+        text: "Maksimal ukuran file adalah 2MB"
       });
       return false;
     }
@@ -347,14 +442,11 @@
     formData.append('mood', formAbsen.mood);
     formData.append('bukti', formAbsen.bukti);
 
-    // Kirim dengan menyertakan ID kegiatan sebagai parameter URL
     const result = await submitAbsenToBackend(selectedAbsen.id, formData);
 
     if (result.success) {
-      // Simpan response dari server (biasanya berisi data absen yang baru)
       const responseData = result.data;
       
-      // Tambahkan data absen ke map dengan createdAt dari server
       const nowIso = new Date().toISOString();
       absenDataMap.set(selectedAbsen.id, {
         createdAt: responseData?.createdAt || nowIso,
@@ -363,7 +455,7 @@
         bukti_url: responseData?.bukti_url || null
       });
       
-      // Update UI: ubah status kegiatan yang baru di-absen
+      // Update UI
       kegiatanList = kegiatanList.map(k => {
         if (k.id === selectedAbsen.id) {
           const absenData = absenDataMap.get(selectedAbsen.id);
@@ -375,7 +467,8 @@
             statusWaktu: formatWaktu(absenData.createdAt),
             pelajaran: formAbsen.pelajaran,
             mood: formAbsen.mood,
-            createdAt: absenData.createdAt
+            createdAt: absenData.createdAt,
+            isButtonDisabled: true
           };
         }
         return k;
@@ -411,6 +504,12 @@
   onMount(async () => { 
     currentUserName = localStorage.getItem("user_name") || "User";
     
+    // Ambil tim user dari localStorage
+    getUserTeam();
+    
+    // Ambil tanggal akun dibuat dari localStorage
+    getAkunDibuat();
+    
     const userRole = localStorage.getItem("user_role");
     if(userRole !== "user"){
       Swal.fire({
@@ -437,10 +536,7 @@
       return;
     }
     
-    // Step 1: Ambil data absen (kegiatan_id + createdAt)
     await fetchSudahAbsenData();
-    
-    // Step 2: Ambil semua kegiatan
     await fetchKegiatan();
   });
 
@@ -454,9 +550,7 @@
       confirmButtonText: "Ya, Logout!" 
     }).then((r) => { 
       if (r.isConfirmed) { 
-        localStorage.removeItem("user_name"); 
-        localStorage.removeItem("user_role"); 
-        localStorage.removeItem("user_id");
+        localStorage.clear();
         push("/SignIn"); 
       } 
     });
@@ -483,10 +577,9 @@
   }
 </script>
 
-<!-- SVELTE:WINDOW DI LEVEL TERATAS -->
+<!-- SVELTE HTML (sama seperti sebelumnya, tidak berubah) -->
 <svelte:window bind:innerWidth />
 
-<!-- LOADING STATE -->
 {#if isLoading}
   <div class="flex items-center justify-center h-screen bg-gray-50">
     <div class="text-center">
@@ -495,7 +588,6 @@
     </div>
   </div>
 
-<!-- KONTEN UTAMA (SAMA SEPERTI SEBELUMNYA) -->
 {:else}
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">
   
@@ -568,13 +660,28 @@
       <div class="max-w-4xl mx-auto space-y-8">
         <h1 class="text-3xl font-black tracking-tight text-gray-800 md:text-4xl lg:text-5xl">Kegiatan</h1>
 
+        {#if userTeam}
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
+            Anda terdaftar sebagai anggota tim <strong>{userTeam}</strong>
+          </div>
+        {:else}
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-700">
+            Anda belum memiliki tim. Beberapa kegiatan yang bersifat "Team Only" tidak akan terlihat.
+          </div>
+        {/if}
+
         <div class="p-6 bg-white border border-gray-100 shadow-sm sm:p-8 rounded-2xl">
           <div class="space-y-10">
             {#each kegiatanList as kegiatan, index}
               <div class="flex flex-col gap-5">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div class="space-y-2">
-                    <h4 class="text-base font-extrabold text-gray-800 sm:text-lg">{kegiatan.minggu} - {kegiatan.judul}</h4>
+                    <div class="flex items-center gap-2">
+                      <h4 class="text-base font-extrabold text-gray-800 sm:text-lg">{kegiatan.nama}</h4>
+                      {#if kegiatan.onlyTeam}
+                        <span class="px-2 py-0.5 text-[10px] font-bold text-blue-600 bg-blue-100 rounded-full">Team Only</span>
+                      {/if}
+                    </div>
                     <div class="flex flex-col gap-1 pl-4 text-sm font-medium text-gray-600 sm:pl-6">
                       <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-gray-400 rounded-full shrink-0"></span>{kegiatan.tanggal}</div>
                       <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-gray-400 rounded-full shrink-0"></span>{kegiatan.waktu}</div>
@@ -592,10 +699,31 @@
                     </div>
                   </div>
                 </div>
-                <button on:click={() => handleButtonClick(kegiatan)}
-                  class="w-full py-3 text-sm font-bold transition-all duration-200 rounded-xl cursor-pointer bg-[#0a2e52] text-white shadow-md hover:shadow-lg active:scale-[0.99]">
-                  {kegiatan.sudahAbsen ? 'Lihat Detail' : 'Isi Absen'}
-                </button>
+                
+                {#if kegiatan.sudahAbsen}
+                  <button 
+                    on:click={() => handleButtonClick(kegiatan)}
+                    class="w-full py-3 text-sm font-bold transition-all duration-200 rounded-xl cursor-pointer bg-green-600 text-white shadow-md hover:bg-green-700"
+                  >
+                    Lihat Detail
+                  </button>
+                {:else if !isSameDay(kegiatan.tanggalRaw)}
+                  <button 
+                    disabled
+                    class="w-full py-3 text-sm font-bold rounded-xl cursor-not-allowed bg-gray-300 text-gray-500"
+                    title="Absen hanya bisa dilakukan pada hari pelaksanaan kegiatan"
+                  >
+                    Isi Absen
+                  </button>
+                {:else}
+                  <button 
+                    on:click={() => handleButtonClick(kegiatan)}
+                    class="w-full py-3 text-sm font-bold transition-all duration-200 rounded-xl cursor-pointer bg-[#0a2e52] text-white shadow-md hover:shadow-lg active:scale-[0.99] hover:bg-blue-900"
+                  >
+                    Isi Absen
+                  </button>
+                {/if}
+                
                 {#if index !== kegiatanList.length - 1}<hr class="border-gray-100" />{/if}
               </div>
             {:else}
@@ -608,7 +736,6 @@
             {/each}
           </div>
           
-          <!-- Pagination Component -->
           {#if totalPage > 1}
             <div class="flex items-center justify-center gap-4 pt-6 mt-6 border-t border-gray-100">
               <button 
@@ -637,6 +764,7 @@
 </div>
 {/if}
 
+
 <!-- DETAIL MODAL -->
 {#if isDetailOpen && selectedKegiatan}
   <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
@@ -644,7 +772,7 @@
     <div class="relative flex flex-col w-full max-w-xl bg-white shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto no-scrollbar z-10">
       <div class="flex items-start justify-between p-6 border-b border-gray-100 sm:p-8">
         <div>
-          <h2 class="text-lg font-black text-gray-800 sm:text-xl">{selectedKegiatan.minggu} - {selectedKegiatan.judul}</h2>
+          <h2 class="text-lg font-black text-gray-800 sm:text-xl">{selectedKegiatan.nama}</h2>
           <p class="mt-1 text-sm font-medium text-gray-500">{selectedKegiatan.tanggal} • {selectedKegiatan.waktu}</p>
         </div>
         <button on:click={closeDetail} class="flex items-center justify-center flex-shrink-0 w-8 h-8 text-white transition-colors bg-[#0a2e52] hover:bg-red-600 rounded-md shadow-sm">
@@ -706,7 +834,7 @@
   </div>
 {/if}
 
-<!-- ABSEN MODAL dengan Drag & Drop -->
+<!-- ABSEN MODAL -->
 {#if isAbsenModalOpen && selectedAbsen}
   <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
     <div class="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-sm" on:click={closeAbsenModal} aria-hidden="true"></div>
@@ -714,7 +842,7 @@
 
       <div class="flex items-start justify-between p-8 border-b border-gray-100">
         <div>
-          <h2 class="text-xl font-black text-gray-800 mb-1">{selectedAbsen.minggu} - {selectedAbsen.judul}</h2>
+          <h2 class="text-xl font-black text-gray-800 mb-1">{selectedAbsen.nama}</h2>
           <p class="text-sm font-medium text-gray-500">{selectedAbsen.tanggal} • {selectedAbsen.waktu}</p>
         </div>
         <button on:click={closeAbsenModal} class="flex items-center justify-center flex-shrink-0 w-8 h-8 text-white transition-colors bg-[#0a2e52] hover:bg-red-600 rounded-md shadow-sm">
@@ -740,7 +868,6 @@
             Bukti <span class="text-red-500">*</span>
           </label>
           
-          <!-- Drag & Drop Area -->
           <div 
             class="flex flex-col items-center justify-center p-10 transition-all duration-200 bg-[#fafafa] border-2 border-dashed rounded-xl {isDragOver ? 'border-[#0a2e52] bg-[#f0f4f9]' : 'border-gray-300'}"
             on:dragover={onDragOver}
@@ -755,7 +882,7 @@
             
             {#if !formAbsen.bukti}
               <p class="mb-2 text-xs font-medium text-gray-500">Drag & drop file di sini atau klik tombol di bawah</p>
-              <p class="mb-4 text-xs text-gray-400">Format: JPG, PNG, WEBP, PDF (Max 10MB)</p>
+              <p class="mb-4 text-xs text-gray-400">Format: JPG dan PNG (Max 2MB)</p>
             {:else}
               <div class="mb-3 text-center">
                 <div class="flex items-center justify-center w-12 h-12 mx-auto mb-2 bg-green-100 rounded-full">
@@ -778,7 +905,7 @@
             <input 
               type="file" 
               id="fileInput"
-              accept="image/*,application/pdf,.jpg,.jpeg,.png,.webp"
+              accept="image/jpeg,image/jpg,image/png"
               class="hidden"
               on:change={onFileSelect}
             />

@@ -10,6 +10,7 @@
   // State untuk menyimpan data kegiatan dan absen
   let semuaKegiatan = []; // Semua kegiatan dari backend
   let absenDataMap = new Map(); // Map untuk menyimpan data absen (kegiatan_id -> data absen)
+  let userTeam = null; // Tim user dari localStorage
   
   // Aktivitas yang sudah difilter
   let aktivitasTersedia = [];
@@ -30,6 +31,23 @@
   let uploadedFileName = "";
   let uploadedFileSize = "";
 
+  // Ambil tim user dari localStorage
+  function getUserTeam() {
+    try {
+      const userTeamStr = localStorage.getItem("tim");
+      if (userTeamStr !== "null" && userTeamStr !== "undefined") {
+        userTeam = userTeamStr;
+        console.log("User team:", userTeam);
+      } else {
+        userTeam = null;
+        console.log("User tidak memiliki tim");
+      }
+    } catch (error) {
+      console.error("Error getting user team:", error);
+      userTeam = null;
+    }
+  }
+
   // Format tanggal ke format Indonesia
   function formatTanggal(dateString) {
     if (!dateString) return "-";
@@ -39,6 +57,28 @@
       month: "long", 
       year: "numeric" 
     });
+  }
+
+  // Cek apakah hari ini sama dengan tanggal kegiatan
+  function isSameDay(kegiatanTanggal) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const kegiatanDate = new Date(kegiatanTanggal);
+    kegiatanDate.setHours(0, 0, 0, 0);
+    
+    return today.getTime() === kegiatanDate.getTime();
+  }
+
+  // Cek apakah kegiatan sudah terlewat (tanggalnya kurang dari hari ini)
+  function isExpired(kegiatanTanggal) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const kegiatanDate = new Date(kegiatanTanggal);
+    kegiatanDate.setHours(0, 0, 0, 0);
+    
+    return kegiatanDate < today;
   }
 
   // Ambil daftar kegiatan yang sudah di-absen dari backend
@@ -120,7 +160,9 @@
             id: kegiatan.id,
             judul: kegiatan.nama_kegiatan || kegiatan.judul,
             tanggal: formatTanggal(kegiatan.tanggal_kegiatan),
+            tanggalRaw: kegiatan.tanggal_kegiatan,
             waktu: kegiatan.jam || "-",
+            hanyaUntukTim: kegiatan.onlyTeam || false,
             sudahAbsen: sudahAbsen,
             createdAt: sudahAbsen ? absenData.createdAt : null,
             deskripsi: sudahAbsen ? absenData.deskripsi : null,
@@ -132,7 +174,7 @@
         semuaKegiatan = [];
       }
       
-      // Filter kegiatan berdasarkan status
+      // Filter kegiatan berdasarkan status dan tim user
       filterKegiatan();
       
     } catch (error) {
@@ -150,18 +192,45 @@
     }
   }
 
-  // Filter kegiatan berdasarkan status (tersedia / selesai)
+  // Filter kegiatan berdasarkan status, hak akses tim, dan tanggal
   function filterKegiatan() {
-    // Kegiatan yang belum di-absen
-    aktivitasTersedia = semuaKegiatan.filter(k => !k.sudahAbsen);
+    // Filter kegiatan yang boleh dilihat user (berdasarkan onlyTeam)
+    let kegiatanYangBolehDilihat = semuaKegiatan.filter(kegiatan => {
+      // Jika kegiatan hanya untuk tim (onlyTeam = true)
+      if (kegiatan.hanyaUntukTim) {
+        // Hanya tampilkan jika user memiliki tim
+        return userTeam !== null && userTeam !== undefined && userTeam !== "null";
+      }
+      // Jika kegiatan public (onlyTeam = false), tampilkan untuk semua
+      return true;
+    });
     
-    // Kegiatan yang sudah di-absen (urutkan dari yang terbaru berdasarkan createdAt)
-    aktivitasSelesai = [...semuaKegiatan.filter(k => k.sudahAbsen)]
+    // Filter lagi: Hanya tampilkan kegiatan yang BELUM lewat (kecuali yang sudah absen)
+    // Kegiatan yang sudah lewat dan belum absen TIDAK ditampilkan di tab tersedia
+    let kegiatanTersediaFilter = kegiatanYangBolehDilihat.filter(k => {
+      // Jika sudah absen, tetap tampilkan (akan masuk ke tab selesai)
+      if (k.sudahAbsen) return true;
+      // Jika belum absen, hanya tampilkan jika belum lewat (hari ini atau masa depan)
+      return !isExpired(k.tanggalRaw);
+    });
+    
+    // Kegiatan yang sudah di-absen
+    aktivitasSelesai = [...kegiatanTersediaFilter.filter(k => k.sudahAbsen)]
       .sort((a, b) => {
         if (!a.createdAt) return 1;
         if (!b.createdAt) return -1;
         return new Date(b.createdAt) - new Date(a.createdAt);
       });
+    
+    // Kegiatan yang belum di-absen (belum lewat)
+    aktivitasTersedia = kegiatanTersediaFilter.filter(k => !k.sudahAbsen);
+    
+    console.log('Kegiatan setelah filter:', {
+      total: kegiatanYangBolehDilihat.length,
+      tersedia: aktivitasTersedia.length,
+      selesai: aktivitasSelesai.length,
+      userTeam: userTeam
+    });
   }
 
   // Kirim absen ke backend
@@ -187,6 +256,17 @@
   }
 
   function openAbsenModal(aktivitas) {
+    // Validasi: cek apakah hari ini sama dengan tanggal kegiatan
+    if (!isSameDay(aktivitas.tanggalRaw)) {
+      Swal.fire({
+        icon: "error",
+        title: "Tidak Bisa Absen",
+        text: "Absen hanya bisa dilakukan pada hari pelaksanaan kegiatan!",
+        confirmButtonColor: "#ef4444"
+      });
+      return;
+    }
+    
     selectedAktivitas = aktivitas;
     formAbsen = { pelajaran: "", bukti: null, mood: "" };
     uploadedFileName = "";
@@ -370,9 +450,7 @@
       confirmButtonText: "Ya, Logout!",
     }).then((result) => {
       if (result.isConfirmed) {
-        localStorage.removeItem("user_name");
-        localStorage.removeItem("user_role");
-        localStorage.removeItem("user_id");
+        localStorage.clear();
         push("/SignIn");
       }
     });
@@ -396,12 +474,13 @@
   function toggleDropdown() { isDropdownOpen = !isDropdownOpen; }
   function closeDropdown() { isDropdownOpen = false; }
 
-  
-
   // Initial load
   onMount(async () => {
     const name = localStorage.getItem("user_name") || "User";
     currentUserName = name;
+    
+    // Ambil tim user dari localStorage
+    getUserTeam();
     
     const userRole = localStorage.getItem("user_role");
     if(userRole !== "user"){
@@ -437,6 +516,7 @@
   });
 </script>
 
+<!-- SVELTE HTML -->
 <svelte:window bind:innerWidth />
 
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">
@@ -540,6 +620,16 @@
           Welcome, {currentUserName}
         </h1>
 
+        {#if userTeam}
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
+            Anda terdaftar sebagai anggota tim <strong>{userTeam}</strong>
+          </div>
+        {:else}
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-700">
+            Anda belum memiliki tim. Beberapa kegiatan yang bersifat "Team Only" tidak akan terlihat.
+          </div>
+        {/if}
+
         <!-- Loading State -->
         {#if isLoading}
           <div class="flex justify-center py-12">
@@ -568,20 +658,34 @@
                   <div class="flex items-center justify-between p-5 {index !== aktivitasTersedia.length - 1 ? 'border-b border-gray-100' : ''} hover:bg-gray-50 transition-colors">
                     <div>
                       <span class="text-[15px] font-semibold text-gray-700">{item.judul}</span>
+                      {#if item.hanyaUntukTim}
+                        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold text-blue-600 bg-blue-100 rounded-full">Team Only</span>
+                      {/if}
                       <div class="flex gap-3 mt-1 text-xs text-gray-400">
                         <span>{item.tanggal}</span>
                         <span>{item.waktu}</span>
                       </div>
                     </div>
-                    <button 
-                      on:click={() => openAbsenModal(item)}
-                      class="px-8 py-2.5 text-sm font-bold text-white bg-[#0a2e52] rounded-md hover:bg-blue-900 transition-colors shadow-sm"
-                    >
-                      Absensi
-                    </button>
+                    
+                    {#if isSameDay(item.tanggalRaw)}
+                      <button 
+                        on:click={() => openAbsenModal(item)}
+                        class="px-8 py-2.5 text-sm font-bold text-white bg-[#0a2e52] rounded-md hover:bg-blue-900 transition-colors shadow-sm"
+                      >
+                        Absensi
+                      </button>
+                    {:else}
+                      <button 
+                        disabled
+                        class="px-8 py-2.5 text-sm font-bold text-gray-400 bg-gray-200 rounded-md cursor-not-allowed"
+                        title="Absen hanya bisa dilakukan pada hari pelaksanaan kegiatan"
+                      >
+                        Belum Waktunya
+                      </button>
+                    {/if}
                   </div>
                 {:else}
-                  <div class="p-8 font-medium text-center text-gray-500"> Belum Ada Aktifitas Terbaru!</div>
+                  <div class="p-8 font-medium text-center text-gray-500">Belum Ada Aktifitas Terbaru!</div>
                 {/each}
               </div>
             {:else}
@@ -590,6 +694,9 @@
                   <div class="flex items-center justify-between p-5 {index !== aktivitasSelesai.length - 1 ? 'border-b border-gray-100' : ''} bg-gray-50/50">
                     <div>
                       <span class="text-[15px] font-semibold text-gray-500 line-through">{item.judul}</span>
+                      {#if item.hanyaUntukTim}
+                        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold text-blue-600 bg-blue-100 rounded-full">Team Only</span>
+                      {/if}
                       <div class="flex gap-3 mt-1 text-xs text-gray-400">
                         <span>{item.tanggal}</span>
                         <span>{item.waktu}</span>

@@ -47,7 +47,8 @@
     localStorage.setItem("role",data.data.role);
     localStorage.setItem("email" , data.data.email);
     localStorage.setItem("status" , data.data.status);
-
+    localStorage.setItem("tim" , data.data.tim)
+    localStorage.setItem("akun_dibuat" , data.data.akun_dibuat)
 
     Swal.fire({
       icon: 'success',
