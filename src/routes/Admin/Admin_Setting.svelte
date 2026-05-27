@@ -11,6 +11,388 @@
   let profile = { nama: "", email: "", phone: "", role: "Admin" };
   let password = { current: "", new: "", confirm: "" };
 
+  let websiteSettings = { heroImage: null, aboutText: "", aboutImage: null, gallery: [] };
+  let selectedFile = null;
+  let filePreview = null;
+  let isUploading = false;
+
+  let selectedAboutFile = null;
+  let aboutFilePreview = null;
+  let isUploadingAbout = false;
+
+  let aboutTextValue = "";
+  let isSavingAboutText = false;
+
+  let selectedGalleryFile = null;
+  let galleryFilePreview = null;
+  let galleryTitle = "";
+  let isUploadingGallery = false;
+  let isDeletingGalleryId = null;
+
+  let subTab = "hero"; // 'hero', 'about', 'gallery'
+
+  async function fetchWebsiteSettings() {
+    try {
+      const res = await fetch("http://localhost:9999/api/settings");
+      if (res.ok) {
+        const result = await res.json();
+        if (result.data) {
+          websiteSettings = result.data;
+          aboutTextValue = result.data.aboutText || "";
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching settings:", e);
+    }
+  }
+
+  function handleFileChange(event) {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        Swal.fire({
+          icon: "warning",
+          title: "File Terlalu Besar",
+          text: "Ukuran file maksimal adalah 2MB.",
+          confirmButtonColor: "#0b5ba2"
+        });
+        return;
+      }
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+      if (!allowedTypes.includes(file.type)) {
+        Swal.fire({
+          icon: "warning",
+          title: "Format Salah",
+          text: "Format file harus JPG, JPEG, atau PNG.",
+          confirmButtonColor: "#0b5ba2"
+        });
+        return;
+      }
+
+      selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        filePreview = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  async function uploadHeroImage() {
+    if (!selectedFile) {
+      Swal.fire({
+        icon: "warning",
+        title: "Pilih File",
+        text: "Pilih file gambar terlebih dahulu!",
+        confirmButtonColor: "#0b5ba2"
+      });
+      return;
+    }
+
+    isUploading = true;
+    const formData = new FormData();
+    formData.append("hero", selectedFile);
+
+    try {
+      Swal.fire({
+        title: "Mengunggah Gambar...",
+        text: "Mohon tunggu sebentar",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      const response = await fetch("http://localhost:9999/api/settings/hero", {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Gambar dashboard berhasil diperbarui.",
+          confirmButtonColor: "#0b5ba2",
+          timer: 1500,
+          showConfirmButton: false
+        });
+        websiteSettings = result.data;
+        selectedFile = null;
+        filePreview = null;
+      } else {
+        throw new Error(result.errors || "Gagal mengunggah gambar");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal!",
+        text: error.message,
+        confirmButtonColor: "#0b5ba2"
+      });
+    } finally {
+      isUploading = false;
+    }
+  }
+
+  function handleAboutFileChange(event) {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        Swal.fire({
+          icon: "warning",
+          title: "File Terlalu Besar",
+          text: "Ukuran file maksimal adalah 2MB.",
+          confirmButtonColor: "#0b5ba2"
+        });
+        return;
+      }
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+      if (!allowedTypes.includes(file.type)) {
+        Swal.fire({
+          icon: "warning",
+          title: "Format Salah",
+          text: "Format file harus JPG, JPEG, atau PNG.",
+          confirmButtonColor: "#0b5ba2"
+        });
+        return;
+      }
+
+      selectedAboutFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        aboutFilePreview = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  async function uploadAboutImage() {
+    if (!selectedAboutFile) {
+      Swal.fire({ icon: "warning", title: "Pilih File", text: "Pilih file gambar About Us terlebih dahulu!", confirmButtonColor: "#0b5ba2" });
+      return;
+    }
+
+    isUploadingAbout = true;
+    const formData = new FormData();
+    formData.append("about", selectedAboutFile);
+
+    try {
+      Swal.fire({
+        title: "Mengunggah Gambar...",
+        text: "Mohon tunggu sebentar",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      const response = await fetch("http://localhost:9999/api/settings/about-image", {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Gambar About Us berhasil diperbarui.",
+          confirmButtonColor: "#0b5ba2",
+          timer: 1500,
+          showConfirmButton: false
+        });
+        websiteSettings = result.data;
+        selectedAboutFile = null;
+        aboutFilePreview = null;
+      } else {
+        throw new Error(result.errors || "Gagal mengunggah gambar");
+      }
+    } catch (error) {
+      console.error("About upload error:", error);
+      Swal.fire({ icon: "error", title: "Gagal!", text: error.message, confirmButtonColor: "#0b5ba2" });
+    } finally {
+      isUploadingAbout = false;
+    }
+  }
+
+  async function saveAboutText() {
+    isSavingAboutText = true;
+    try {
+      Swal.fire({
+        title: "Menyimpan Teks...",
+        text: "Mohon tunggu sebentar",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      const response = await fetch("http://localhost:9999/api/settings/about-text", {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ aboutText: aboutTextValue })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Teks About Us berhasil disimpan.",
+          confirmButtonColor: "#0b5ba2",
+          timer: 1500,
+          showConfirmButton: false
+        });
+        websiteSettings = result.data;
+      } else {
+        throw new Error(result.errors || "Gagal menyimpan teks");
+      }
+    } catch (error) {
+      console.error("About text save error:", error);
+      Swal.fire({ icon: "error", title: "Gagal!", text: error.message, confirmButtonColor: "#0b5ba2" });
+    } finally {
+      isSavingAboutText = false;
+    }
+  }
+
+  function handleGalleryFileChange(event) {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        Swal.fire({
+          icon: "warning",
+          title: "File Terlalu Besar",
+          text: "Ukuran file maksimal adalah 2MB.",
+          confirmButtonColor: "#0b5ba2"
+        });
+        return;
+      }
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+      if (!allowedTypes.includes(file.type)) {
+        Swal.fire({
+          icon: "warning",
+          title: "Format Salah",
+          text: "Format file harus JPG, JPEG, atau PNG.",
+          confirmButtonColor: "#0b5ba2"
+        });
+        return;
+      }
+
+      selectedGalleryFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        galleryFilePreview = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  async function uploadGalleryItem() {
+    if (!selectedGalleryFile) {
+      Swal.fire({ icon: "warning", title: "Pilih File", text: "Pilih file gambar galeri terlebih dahulu!", confirmButtonColor: "#0b5ba2" });
+      return;
+    }
+
+    isUploadingGallery = true;
+    const formData = new FormData();
+    formData.append("galleryItem", selectedGalleryFile);
+    formData.append("title", galleryTitle || "Foto Galeri");
+
+    try {
+      Swal.fire({
+        title: "Menambahkan Foto...",
+        text: "Mohon tunggu sebentar",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      const response = await fetch("http://localhost:9999/api/settings/gallery", {
+        method: "POST",
+        credentials: "include",
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Foto berhasil ditambahkan ke galeri.",
+          confirmButtonColor: "#0b5ba2",
+          timer: 1500,
+          showConfirmButton: false
+        });
+        websiteSettings = result.data;
+        selectedGalleryFile = null;
+        galleryFilePreview = null;
+        galleryTitle = "";
+      } else {
+        throw new Error(result.errors || "Gagal menambahkan foto");
+      }
+    } catch (error) {
+      console.error("Gallery upload error:", error);
+      Swal.fire({ icon: "error", title: "Gagal!", text: error.message, confirmButtonColor: "#0b5ba2" });
+    } finally {
+      isUploadingGallery = false;
+    }
+  }
+
+  async function deleteGalleryItem(id) {
+    Swal.fire({
+      title: "Hapus Foto ini?",
+      text: "Foto ini akan dihapus permanen dari galeri.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#9ca3af",
+      confirmButtonText: "Ya, Hapus!"
+    }).then(async (r) => {
+      if (r.isConfirmed) {
+        isDeletingGalleryId = id;
+        try {
+          Swal.fire({
+            title: "Menghapus Foto...",
+            text: "Mohon tunggu sebentar",
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+          });
+
+          const response = await fetch(`http://localhost:9999/api/settings/gallery/${id}`, {
+            method: "DELETE",
+            credentials: "include"
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            Swal.fire({
+              icon: "success",
+              title: "Berhasil!",
+              text: "Foto berhasil dihapus.",
+              confirmButtonColor: "#0b5ba2",
+              timer: 1500,
+              showConfirmButton: false
+            });
+            websiteSettings = result.data;
+          } else {
+            throw new Error(result.errors || "Gagal menghapus foto");
+          }
+        } catch (error) {
+          console.error("Delete gallery error:", error);
+          Swal.fire({ icon: "error", title: "Gagal!", text: error.message, confirmButtonColor: "#0b5ba2" });
+        } finally {
+          isDeletingGalleryId = null;
+        }
+      }
+    });
+  }
+
   onMount(() => {
     const name = localStorage.getItem("user_name");
     if (name) {
@@ -45,6 +427,7 @@
       });
       return;
     }
+    fetchWebsiteSettings();
   });
 
 
@@ -88,6 +471,7 @@
   const tabs = [
     { id: "profile", label: "Profil", icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
     { id: "password", label: "Keamanan", icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" },
+    { id: "website", label: "Website", icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" }
   ];
 </script>
 
@@ -258,6 +642,313 @@
               <div class="flex justify-end pt-2">
                 <button on:click={savePassword} class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] active:scale-95">Ubah Password</button>
               </div>
+            </div>
+          </div>
+
+        {:else if activeTab === "website"}
+          <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
+            <div class="px-5 py-4 border-b border-gray-100 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 class="text-lg font-bold text-gray-800">Pengaturan Tampilan Website</h3>
+                <p class="text-sm text-gray-500">Kelola aset gambar dan deskripsi website utama</p>
+              </div>
+              
+              <!-- Sub Tabs inside Website Settings -->
+              <div class="flex bg-gray-100 p-1 rounded-lg self-start sm:self-center">
+                <button 
+                  on:click={() => subTab = "hero"} 
+                  class="px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer {subTab === 'hero' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
+                >
+                  Hero Banner
+                </button>
+                <button 
+                  on:click={() => subTab = "about"} 
+                  class="px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer {subTab === 'about' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
+                >
+                  About Us
+                </button>
+                <button 
+                  on:click={() => subTab = "gallery"} 
+                  class="px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer {subTab === 'gallery' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}"
+                >
+                  Gallery Slider
+                </button>
+              </div>
+            </div>
+            
+            <div class="p-5 sm:p-6">
+              
+              {#if subTab === "hero"}
+                <!-- HERO SECTION -->
+                <div class="space-y-6">
+                  <!-- Current Image Preview -->
+                  <div class="space-y-2">
+                    <span class="block text-sm font-semibold text-gray-700">Gambar Hero Dashboard Saat Ini</span>
+                    <div class="relative max-w-xl aspect-[4/3] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-inner flex items-center justify-center">
+                      {#if filePreview}
+                        <img src={filePreview} alt="Pratinjau Baru" class="w-full h-full object-cover" />
+                        <span class="absolute top-3 left-3 bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">Pratinjau Gambar Baru</span>
+                      {:else if websiteSettings.heroImage}
+                        <img src={`http://localhost:9999/assets/${websiteSettings.heroImage}`} alt="Hero Saat Ini" class="w-full h-full object-cover" />
+                      {:else}
+                        <img src="src/assets/bglogin.jpg" alt="Default Hero" class="w-full h-full object-cover" />
+                        <span class="absolute top-3 left-3 bg-gray-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">Default Sistem</span>
+                      {/if}
+                    </div>
+                  </div>
+
+                  <!-- Upload Field -->
+                  <div class="space-y-2">
+                    <label class="block text-sm font-semibold text-gray-700">Unggah Gambar Hero Baru</label>
+                    <div class="flex items-center justify-center w-full max-w-xl">
+                      <label class="flex flex-col items-center justify-center w-full h-36 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                          <svg class="w-8 h-8 mb-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          {#if selectedFile}
+                            <p class="text-sm font-bold text-blue-600 truncate max-w-xs">{selectedFile.name}</p>
+                            <p class="text-xs text-gray-500 mt-1">Klik untuk mengganti file</p>
+                          {:else}
+                            <p class="text-sm text-gray-500 font-semibold">Klik untuk memilih gambar</p>
+                            <p class="text-xs text-gray-400 mt-1">PNG, JPG, JPEG (Max 2MB)</p>
+                          {/if}
+                        </div>
+                        <input type="file" accept="image/*" class="hidden" on:change={handleFileChange} />
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Action buttons -->
+                  <div class="flex justify-between items-center pt-4 max-w-xl border-t border-gray-100">
+                    {#if selectedFile}
+                      <button 
+                        on:click={() => { selectedFile = null; filePreview = null; }} 
+                        class="px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 transition-all cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                    {:else}
+                      <div></div>
+                    {/if}
+                    <button 
+                      on:click={uploadHeroImage} 
+                      disabled={!selectedFile || isUploading}
+                      class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex items-center gap-2 cursor-pointer"
+                    >
+                      {#if isUploading}
+                        <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Mengunggah...
+                      {:else}
+                        Perbarui Gambar Hero
+                      {/if}
+                    </button>
+                  </div>
+                </div>
+
+              {:else if subTab === "about"}
+                <!-- ABOUT US SECTION -->
+                <div class="space-y-6">
+                  <!-- Text Editor -->
+                  <div class="space-y-2 max-w-xl">
+                    <label for="aboutText" class="block text-sm font-semibold text-gray-700">Teks Deskripsi About Us</label>
+                    <textarea 
+                      id="aboutText" 
+                      bind:value={aboutTextValue} 
+                      rows="4" 
+                      class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-y"
+                      placeholder="Masukkan deskripsi mengenai organisasi/website ini..."
+                    ></textarea>
+                    <div class="flex justify-end pt-1">
+                      <button 
+                        on:click={saveAboutText} 
+                        disabled={isSavingAboutText}
+                        class="px-5 py-2 text-xs font-bold text-white transition-all bg-[#0a4682] rounded-lg hover:bg-[#0c5599] disabled:opacity-50 cursor-pointer"
+                      >
+                        Simpan Perubahan Teks
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Image Preview -->
+                  <div class="space-y-2 pt-4 border-t border-gray-100 max-w-xl">
+                    <span class="block text-sm font-semibold text-gray-700">Gambar About Us Saat Ini</span>
+                    <div class="relative w-full aspect-video bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-inner flex items-center justify-center">
+                      {#if aboutFilePreview}
+                        <img src={aboutFilePreview} alt="Pratinjau Baru" class="w-full h-full object-cover" />
+                        <span class="absolute top-3 left-3 bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">Pratinjau Baru</span>
+                      {:else if websiteSettings.aboutImage}
+                        <img src={`http://localhost:9999/assets/${websiteSettings.aboutImage}`} alt="About Us Saat Ini" class="w-full h-full object-cover" />
+                      {:else}
+                        <img src="src/assets/bglogin.jpg" alt="Default About Us" class="w-full h-full object-cover" />
+                        <span class="absolute top-3 left-3 bg-gray-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">Default Sistem</span>
+                      {/if}
+                    </div>
+                  </div>
+
+                  <!-- Upload Field -->
+                  <div class="space-y-2 max-w-xl">
+                    <label class="block text-sm font-semibold text-gray-700">Unggah Gambar About Us Baru</label>
+                    <div class="flex items-center justify-center w-full">
+                      <label class="flex flex-col items-center justify-center w-full h-36 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                          <svg class="w-8 h-8 mb-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          {#if selectedAboutFile}
+                            <p class="text-sm font-bold text-blue-600 truncate max-w-xs">{selectedAboutFile.name}</p>
+                            <p class="text-xs text-gray-500 mt-1">Klik untuk mengganti file</p>
+                          {:else}
+                            <p class="text-sm text-gray-500 font-semibold">Klik untuk memilih gambar</p>
+                            <p class="text-xs text-gray-400 mt-1">PNG, JPG, JPEG (Max 2MB)</p>
+                          {/if}
+                        </div>
+                        <input type="file" accept="image/*" class="hidden" on:change={handleAboutFileChange} />
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Action buttons -->
+                  <div class="flex justify-between items-center pt-4 max-w-xl border-t border-gray-100">
+                    {#if selectedAboutFile}
+                      <button 
+                        on:click={() => { selectedAboutFile = null; aboutFilePreview = null; }} 
+                        class="px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 transition-all cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                    {:else}
+                      <div></div>
+                    {/if}
+                    <button 
+                      on:click={uploadAboutImage} 
+                      disabled={!selectedAboutFile || isUploadingAbout}
+                      class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex items-center gap-2 cursor-pointer"
+                    >
+                      {#if isUploadingAbout}
+                        <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Mengunggah...
+                      {:else}
+                        Perbarui Gambar About Us
+                      {/if}
+                    </button>
+                  </div>
+                </div>
+
+              {:else if subTab === "gallery"}
+                <!-- GALLERY SLIDER SECTION -->
+                <div class="space-y-8">
+                  <!-- Form Add New Item -->
+                  <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 space-y-4 max-w-xl">
+                    <h4 class="text-sm font-bold text-gray-800">Tambah Foto Baru ke Galeri</h4>
+                    
+                    <div class="space-y-3">
+                      <div>
+                        <label for="galleryTitle" class="block mb-1 text-xs font-semibold text-gray-700">Judul Foto (Opsional)</label>
+                        <input 
+                          id="galleryTitle" 
+                          type="text" 
+                          bind:value={galleryTitle} 
+                          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" 
+                          placeholder="Masukkan judul atau keterangan foto..." 
+                        />
+                      </div>
+                      
+                      <div class="space-y-1">
+                        <span class="block text-xs font-semibold text-gray-700">File Foto</span>
+                        <div class="flex items-center gap-4">
+                          <label class="px-4 py-2 text-xs font-bold text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 cursor-pointer flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Pilih Foto
+                            <input type="file" accept="image/*" class="hidden" on:change={handleGalleryFileChange} />
+                          </label>
+                          {#if selectedGalleryFile}
+                            <span class="text-xs font-bold text-blue-600 truncate max-w-[200px]">{selectedGalleryFile.name}</span>
+                          {:else}
+                            <span class="text-xs text-gray-400">Belum memilih foto</span>
+                          {/if}
+                        </div>
+                      </div>
+
+                      {#if galleryFilePreview}
+                        <div class="relative w-32 aspect-[4/3] rounded-lg overflow-hidden border border-gray-200 mt-2 bg-white">
+                          <img src={galleryFilePreview} alt="Pratinjau Galeri" class="w-full h-full object-cover" />
+                        </div>
+                      {/if}
+                    </div>
+
+                    <div class="flex justify-end pt-2">
+                      <button 
+                        on:click={uploadGalleryItem}
+                        disabled={!selectedGalleryFile || isUploadingGallery}
+                        class="px-5 py-2 text-xs font-bold text-white bg-[#0a4682] hover:bg-[#0c5599] rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {#if isUploadingGallery}
+                          <div class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Menambahkan...
+                        {:else}
+                          Tambah ke Galeri
+                        {/if}
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Gallery List / Grid -->
+                  <div class="space-y-4">
+                    <h4 class="text-sm font-bold text-gray-800">Daftar Foto Galeri Saat Ini</h4>
+                    
+                    {#if websiteSettings.gallery && websiteSettings.gallery.length > 0}
+                      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                        {#each websiteSettings.gallery as item}
+                          <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex flex-col group relative">
+                            <!-- Image container -->
+                            <div class="aspect-[4/3] bg-gray-50 border-b border-gray-100 overflow-hidden relative">
+                              <img src={`http://localhost:9999/assets/${item.image}`} alt={item.title} class="w-full h-full object-cover" />
+                              
+                              <!-- Floating Delete Button -->
+                              <button 
+                                on:click={() => deleteGalleryItem(item.id)}
+                                disabled={isDeletingGalleryId === item.id}
+                                class="absolute top-2 right-2 p-1.5 bg-white hover:bg-red-50 text-red-500 hover:text-red-700 rounded-lg shadow-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer disabled:opacity-50"
+                                title="Hapus foto"
+                              >
+                                <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                            <!-- Title info -->
+                            <div class="p-3.5 flex justify-between items-center">
+                              <span class="text-xs font-bold text-gray-700 truncate pr-2">{item.title}</span>
+                              <button 
+                                on:click={() => deleteGalleryItem(item.id)}
+                                disabled={isDeletingGalleryId === item.id}
+                                class="text-red-500 hover:text-red-700 transition-colors sm:hidden"
+                              >
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        {/each}
+                      </div>
+                    {:else}
+                      <div class="p-8 border border-gray-200 border-dashed rounded-xl flex flex-col items-center justify-center text-center bg-gray-50 max-w-xl">
+                        <svg class="w-10 h-10 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <p class="text-xs font-semibold text-gray-500">Belum ada foto galeri yang diunggah</p>
+                        <p class="text-[10px] text-gray-400 mt-0.5">Slider di dashboard utama akan menampilkan gambar default sistem</p>
+                      </div>
+                    {/if}
+                  </div>
+                </div>
+
+              {/if}
+
             </div>
           </div>
 

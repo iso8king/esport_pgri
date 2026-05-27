@@ -487,6 +487,7 @@
                 <thead class="sticky top-0 z-10 bg-gray-50 outline outline-1 outline-gray-100">
                   <tr class="text-sm text-gray-500 border-b border-gray-100 bg-gray-50">
                     <th class="px-6 py-4 font-semibold whitespace-nowrap">Nama</th>
+                    <th class="px-6 py-4 font-semibold whitespace-nowrap">Username</th>
                     <th class="px-6 py-4 font-semibold whitespace-nowrap">Team</th>
                     <th class="px-6 py-4 font-semibold whitespace-nowrap">Role</th>
                     <th class="px-6 py-4 font-semibold whitespace-nowrap">Status</th>
@@ -496,6 +497,7 @@
                   {#each filterAnggotaList as orang}
                     <tr class="transition-colors border-b border-gray-50 hover:bg-gray-50/50">
                       <td class="px-6 py-4 font-medium text-gray-900">{orang.nama}</td>
+                      <td class="px-6 py-4 font-medium text-gray-900">{orang.username}</td>
                       <td class="px-6 py-4 whitespace-nowrap">
                         {#if orang.team !== "No Team"}
                           <span class="px-3 py-1 text-xs font-bold text-green-800 bg-green-100 rounded-full">
