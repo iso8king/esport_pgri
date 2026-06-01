@@ -30,10 +30,10 @@
   $: itemsToRender = settings.gallery && settings.gallery.length > 0 
     ? settings.gallery 
     : [
-        { id: 1, isDefault: true, title: 'Gambar 1' },
-        { id: 2, isDefault: true, title: 'Gambar 2' },
-        { id: 3, isDefault: true, title: 'Gambar 3' },
-        { id: 4, isDefault: true, title: 'Gambar 4' }
+        { id: 1, isDefault: true, title: 'Gambar 1', description: 'Deskripsi singkat mengenai foto kegiatan turnamen PGRI.' },
+        { id: 2, isDefault: true, title: 'Gambar 2', description: 'Keseruan peserta dalam turnamen E-sport PGRI.' },
+        { id: 3, isDefault: true, title: 'Gambar 3', description: 'Sesi latihan rutin tim E-sport PGRI.' },
+        { id: 4, isDefault: true, title: 'Gambar 4', description: 'Penyerahan trofi juara utama turnamen.' }
       ];
 
   function slideLeft() {
@@ -151,12 +151,19 @@
           class="w-full flex gap-4 md:gap-8 overflow-x-auto snap-x snap-mandatory scroll-smooth hilangkan-scrollbar py-4"
         >
           {#each itemsToRender as item}
-            <div class="w-full md:w-[calc(50%-1rem)] shrink-0 snap-center aspect-[4/3] bg-[#cde0fb] rounded-sm shadow-xl flex items-center justify-center overflow-hidden">
+            <div class="w-full md:w-[calc(50%-1rem)] shrink-0 snap-center aspect-[4/3] bg-[#cde0fb] rounded-lg shadow-xl flex items-center justify-center overflow-hidden relative group cursor-pointer">
               {#if item.isDefault}
-                <span class="text-[#0b355b]/50 font-bold text-2xl">{item.title}</span>
+                <span class="text-[#0b355b]/50 font-bold text-2xl group-hover:scale-95 transition-transform duration-300">{item.title}</span>
               {:else}
-                <img src={`http://localhost:9999/assets/${item.image}`} alt={item.title} class="w-full h-full object-cover"/>
+                <img src={`http://localhost:9999/assets/${item.image}`} alt={item.description || item.title || "Foto Galeri"} class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
               {/if}
+              
+              <!-- Hover Overlay dengan Deskripsi -->
+              <div class="absolute inset-0 bg-black/75 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-center items-center p-6 text-center select-none">
+                <p class="text-white text-xs sm:text-sm leading-relaxed max-w-xs font-medium">
+                  {item.description || item.title || "Tidak ada deskripsi untuk foto ini."}
+                </p>
+              </div>
             </div>
           {/each}
         </div>

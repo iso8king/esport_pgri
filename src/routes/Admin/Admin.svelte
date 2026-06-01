@@ -267,7 +267,7 @@
           Dashboard
         </p>
         <button on:click={() => {
-                window.location.href = '#/beranda';
+                window.location.href = '#/admin/beranda';
               }} 
         class="flex items-center w-full gap-3 px-4 py-2.5 text-sm font-medium text-white transition-colors rounded-lg bg-white/10">
           Beranda

@@ -25,7 +25,7 @@
 
   let selectedGalleryFile = null;
   let galleryFilePreview = null;
-  let galleryTitle = "";
+  let galleryDescription = "";
   let isUploadingGallery = false;
   let isDeletingGalleryId = null;
 
@@ -301,7 +301,7 @@
     isUploadingGallery = true;
     const formData = new FormData();
     formData.append("galleryItem", selectedGalleryFile);
-    formData.append("title", galleryTitle || "Foto Galeri");
+    formData.append("description", galleryDescription || "Deskripsi Galeri");
 
     try {
       Swal.fire({
@@ -331,7 +331,7 @@
         websiteSettings = result.data;
         selectedGalleryFile = null;
         galleryFilePreview = null;
-        galleryTitle = "";
+        galleryDescription = "";
       } else {
         throw new Error(result.errors || "Gagal menambahkan foto");
       }
@@ -844,14 +844,14 @@
                     
                     <div class="space-y-3">
                       <div>
-                        <label for="galleryTitle" class="block mb-1 text-xs font-semibold text-gray-700">Judul Foto (Opsional)</label>
-                        <input 
-                          id="galleryTitle" 
-                          type="text" 
-                          bind:value={galleryTitle} 
-                          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" 
-                          placeholder="Masukkan judul atau keterangan foto..." 
-                        />
+                        <label for="galleryDescription" class="block mb-1 text-xs font-semibold text-gray-700">Deskripsi Foto (Opsional)</label>
+                        <textarea 
+                          id="galleryDescription" 
+                          bind:value={galleryDescription} 
+                          rows="2"
+                          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-y" 
+                          placeholder="Masukkan deskripsi foto..." 
+                        ></textarea>
                       </div>
                       
                       <div class="space-y-1">
@@ -905,7 +905,7 @@
                           <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex flex-col group relative">
                             <!-- Image container -->
                             <div class="aspect-[4/3] bg-gray-50 border-b border-gray-100 overflow-hidden relative">
-                              <img src={`http://localhost:9999/assets/${item.image}`} alt={item.title} class="w-full h-full object-cover" />
+                              <img src={`http://localhost:9999/assets/${item.image}`} alt={item.description || item.title || "Foto Galeri"} class="w-full h-full object-cover" />
                               
                               <!-- Floating Delete Button -->
                               <button 
@@ -921,7 +921,7 @@
                             </div>
                             <!-- Title info -->
                             <div class="p-3.5 flex justify-between items-center">
-                              <span class="text-xs font-bold text-gray-700 truncate pr-2">{item.title}</span>
+                              <span class="text-xs font-bold text-gray-700 truncate pr-2">{item.description || item.title || "Deskripsi Galeri"}</span>
                               <button 
                                 on:click={() => deleteGalleryItem(item.id)}
                                 disabled={isDeletingGalleryId === item.id}

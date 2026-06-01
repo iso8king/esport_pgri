@@ -451,7 +451,7 @@
     }).then((result) => {
       if (result.isConfirmed) {
         localStorage.clear();
-        push("/SignIn");
+        push("/");
       }
     });
   }
