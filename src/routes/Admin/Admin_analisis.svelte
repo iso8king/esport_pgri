@@ -207,7 +207,9 @@
           on:click={toggleDropdown}
           class="flex items-center gap-2 px-2 py-1 transition-colors rounded-md cursor-pointer md:gap-3 hover:bg-gray-50 focus:outline-none"
         >
-          <img src="src/assets/profile.svg" alt="{currentUserName}" class="w-11 h-11 rounded-full" />
+          <div class="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center">
+            <span class="text-lg font-bold text-black">{currentUserName.charAt(0).toUpperCase()}</span>
+          </div>
           <span class="text-sm font-bold text-gray-700">{currentUserName}</span>
           <svg
             class="w-4 h-4 text-gray-400 transition-transform duration-200 {isDropdownOpen ? 'rotate-180' : ''}"
