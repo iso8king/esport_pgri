@@ -31,6 +31,21 @@
   let countdown = 0;
   let countdownInterval = null;
 
+  // Helper function untuk cek apakah user punya tim
+  function hasTeam() {
+    const tim = localStorage.getItem("tim");
+    return tim && tim !== "null" && tim !== "undefined" && tim.trim() !== "";
+  }
+
+  // Helper function untuk mendapatkan nama tim
+  function getTeamName() {
+    const tim = localStorage.getItem("tim");
+    if (!tim || tim === "null" || tim === "undefined" || tim.trim() === "") {
+      return "Tidak Ada Tim";
+    }
+    return tim;
+  }
+
   onMount(() => {
     const name = localStorage.getItem("user_name");
     if (name) {
@@ -39,7 +54,7 @@
       profile.email = localStorage.getItem("email") || "";
       profile.game_id = localStorage.getItem("user_game_id") || "";
       profile.server_id = localStorage.getItem("user_server_id") || "";
-      profile.team = localStorage.getItem("tim") || "";
+      profile.team = getTeamName(); // Gunakan fungsi helper
     } else {
       push("/");
     }
@@ -414,6 +429,8 @@
       confirmButtonColor: "#ef4444", cancelButtonColor: "#9ca3af", confirmButtonText: "Ya, Logout!",
     }).then((r) => { if (r.isConfirmed) {
       localStorage.clear();
+      push("/")
+
     } });
   }
 
@@ -508,9 +525,9 @@
       <p class="mt-1 text-sm text-gray-500">Kelola akun dan preferensi Anda</p>
     </div>
 
-    <!-- Profile Card Top -->
+    <!-- Profile Card Top - Warna berubah berdasarkan status tim -->
     <div class="relative p-6 overflow-hidden text-white shadow-lg sm:p-8 bg-gradient-to-r 
-      {profile.team ? 'from-[#0a4682] to-[#126bc2]' : 'from-red-700 to-rose-600'} 
+      {hasTeam() ? 'from-[#0a4682] to-[#126bc2]' : 'from-red-700 to-rose-600'} 
       rounded-2xl"
     >
       <div class="relative z-10 flex flex-col items-center gap-4 sm:flex-row sm:items-center">
@@ -522,11 +539,11 @@
         <div class="text-center sm:text-left">
           <h3 class="text-xl font-bold sm:text-2xl">{currentUserName}</h3>
           
-          <p class="text-sm {profile.team ? 'text-blue-200' : 'text-red-100'}">
-            {profile.role} • {profile.team ? profile.team : 'Belum Ada Tim'}
+          <p class="text-sm {hasTeam() ? 'text-blue-200' : 'text-red-100'}">
+            {profile.role} • {getTeamName()}
           </p>
           
-          <p class="mt-1 text-xs {profile.team ? 'text-blue-300' : 'text-red-200'}">
+          <p class="mt-1 text-xs {hasTeam() ? 'text-blue-300' : 'text-red-200'}">
             {profile.email}
           </p>
         </div>
@@ -542,7 +559,7 @@
           on:click={() => activeTab = tab.id}
           class="flex items-center justify-center flex-1 gap-2 px-3 py-2.5 text-sm font-semibold rounded-lg transition-all 
             {activeTab === tab.id 
-              ? (profile.team ? 'bg-[#0a4682] text-white shadow-md' : 'bg-red-700 text-white shadow-md') 
+              ? (hasTeam() ? 'bg-[#0a4682] text-white shadow-md' : 'bg-red-700 text-white shadow-md') 
               : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}"
         >
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -565,7 +582,7 @@
             <div>
               <label for="nama" class="block mb-1.5 text-sm font-semibold text-gray-700">Nama Lengkap</label>
               <input id="nama" type="text" bind:value={profile.nama} 
-                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
             </div>
             <div>
               <label for="role" class="block mb-1.5 text-sm font-semibold text-gray-700">Role</label>
@@ -577,25 +594,25 @@
           <div>
             <label for="email" class="block mb-1.5 text-sm font-semibold text-gray-700">Email</label>
             <input id="email" type="email" bind:value={profile.email} 
-              class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+              class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
           </div>
           
           <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
               <label for="game_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Game ID</label>
               <input id="game_id" type="text" bind:value={profile.game_id} 
-                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
             </div>
             <div>
               <label for="server_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Server ID</label>
               <input id="server_id" type="text" bind:value={profile.server_id} 
-                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
             </div>
           </div>
           
           <div class="flex justify-end pt-2">
             <button on:click={saveProfile} 
-              class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 {profile.team ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
+              class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 {hasTeam() ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
             >
               Simpan Profil
             </button>
@@ -614,25 +631,25 @@
           <div>
             <label for="currentPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Password Saat Ini</label>
             <input id="currentPw" type="password" bind:value={password.current} placeholder="Masukkan password saat ini"
-              class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+              class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
           </div>
           
           <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
               <label for="newPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Password Baru</label>
               <input id="newPw" type="password" bind:value={password.new} placeholder="Masukkan password baru"
-                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
             </div>
             <div>
               <label for="confirmPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Konfirmasi Password</label>
               <input id="confirmPw" type="password" bind:value={password.confirm} placeholder="Ulangi password baru"
-                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {profile.team ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
             </div>
           </div>
           
           <div class="flex justify-end pt-2">
             <button on:click={savePassword} 
-              class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 {profile.team ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
+              class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 {hasTeam() ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
             >
               Ubah Password
             </button>

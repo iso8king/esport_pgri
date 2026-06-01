@@ -9,21 +9,26 @@
   let jadwalAbsen = [];
   let isLoading = true;
   let totalUserDiDatabase = 0;
+  let totalUserOnTeam = 0;
+  
+  // State untuk tab aktif
+  let activeTab = "semua"; // "semua", "hariIni", "terlewat", "mendatang"
 
   // State untuk modal
-  let isAddJadwalModalOpen = false;
   let selectedJadwal = null;
   let isLihatModalOpen = false;
   let selectedSiswaDetail = null;
 
-  let formJadwal = {
-    judul: "",
-    tanggal: "",
-    jamMulai: "",
-    jamSelesai: ""
-  };
-
   let detailSiswaAbsen = [];
+
+  // Filter jadwal berdasarkan tab aktif
+  $: filteredJadwal = jadwalAbsen.filter(jadwal => {
+    if (activeTab === "semua") return true;
+    if (activeTab === "hariIni") return jadwal.status === "Hari Ini";
+    if (activeTab === "terlewat") return jadwal.status === "Terlewat";
+    if (activeTab === "mendatang") return jadwal.status === "Mendatang";
+    return true;
+  });
 
   // Fungsi untuk mengambil data kegiatan dari backend
   async function fetchKegiatanData() {
@@ -43,16 +48,23 @@
         
         const kegiatanData = result.data?.data || [];
         
-        jadwalAbsen = kegiatanData.map(item => ({
-          id: item.id,
-          judul: item.nama_kegiatan,
-          tanggal: formatDateIndonesian(item.tanggal_kegiatan),
-          waktu: item.jam,
-          totalHadir: 0,
-          statusTanggal: getStatusTanggal(item.tanggal_kegiatan),
-          statusWaktu: getStatusWaktu(item.jam),
-          isDisabled: false
-        }));
+        jadwalAbsen = kegiatanData.map(item => {
+          return {
+            id: item.id,
+            judul: item.nama_kegiatan,
+            tanggal: item.tanggal_kegiatan,
+            tanggalFormatted: formatDateIndonesian(item.tanggal_kegiatan),
+            waktu: item.jam,
+            onlyTeam: item.onlyTeam || false,
+            totalHadir: 0,
+            statusTanggal: getStatusTanggal(item.tanggal_kegiatan),
+            status: getStatusTanggal(item.tanggal_kegiatan),
+            isDisabled: false
+          };
+        });
+        
+        // Urutkan berdasarkan tanggal (yang terdekat dulu)
+        jadwalAbsen.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
         
         console.log('JadwalAbsen setelah transformasi:', jadwalAbsen);
       } else {
@@ -67,10 +79,33 @@
     }
   }
 
+  async function fetchAllTotalHadir() {
+    for (const jadwal of jadwalAbsen) {
+      try {
+        const response = await fetch(`http://localhost:9999/api/absen/${jadwal.id}/get`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          const absensiData = result.data || [];
+          jadwal.totalHadir = absensiData.length;
+        }
+      } catch (error) {
+        console.error(`Error fetching total hadir for ${jadwal.id}:`, error);
+      }
+    }
+    jadwalAbsen = [...jadwalAbsen];
+  }
+
   // Fungsi untuk mengambil total user dari database
   async function fetchTotalUser() {
     try {
-      const response = await fetch('http://localhost:9999/api/user/count', {
+      const response = await fetch('http://localhost:9999/api/statistik', {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -80,11 +115,14 @@
       
       if (response.ok) {
         const result = await response.json();
-        totalUserDiDatabase = result.data?.total || 0;
+        totalUserDiDatabase = result.data?.allUser || 0;
+        totalUserOnTeam = result.data?.onTeam || 0;
+        console.log(`Total User: ${totalUserDiDatabase}, On Team: ${totalUserOnTeam}`);
       }
     } catch (error) {
       console.error('Error fetching total user:', error);
       totalUserDiDatabase = 0;
+      totalUserOnTeam = 0;
     }
   }
 
@@ -103,24 +141,23 @@
         const result = await response.json();
         console.log('Response absen:', result);
         
-        // Response struktur: { data: [...] }
         const absensiData = result.data || [];
         
         detailSiswaAbsen = absensiData.map(item => ({
           id: item.id || Math.random(),
           nama: item.user?.nama || "Unknown",
-          status: "Sudah Absen", // Karena semua yang ada di response sudah absen
+          status: "Sudah Absen",
           btnLihatDisabled: false,
           jawaban: {
             moodEmoji: getMoodEmoji(item.mood),
             moodText: item.mood || "Tidak diketahui",
-            tanggal: formatDateIndonesian(new Date()),
+            tanggal: formatDateIndonesian(item.createdAt || new Date()),
             pelajaran: item.deskripsi || "-",
             bukti: item.bukti || null
           }
         }));
         
-        // Update total hadir
+        // Update total hadir di jadwalAbsen
         const totalHadir = absensiData.length;
         const jadwalIndex = jadwalAbsen.findIndex(j => j.id === kegiatanId);
         if (jadwalIndex !== -1) {
@@ -184,105 +221,22 @@
     }
   }
 
-  function getStatusWaktu(waktuString) {
-    if (!waktuString) return "-";
-    const now = new Date();
-    
-    let endTime = "";
-    if (waktuString.includes("-")) {
-      endTime = waktuString.split("-")[1].trim();
-    } else if (waktuString.includes(":")) {
-      endTime = waktuString;
-    }
-    
-    if (endTime) {
-      const [endHour, endMinute] = endTime.split(/[:.]/).map(Number);
-      const endDate = new Date();
-      endDate.setHours(endHour, endMinute || 0, 0, 0);
-      
-      if (now > endDate) {
-        return "Terlewat";
-      } else {
-        return "Belum Dimulai";
-      }
-    }
-    return "-";
+  // Mendapatkan total user berdasarkan tipe kegiatan
+  function getTotalUserByType(onlyTeam) {
+    return onlyTeam ? totalUserOnTeam : totalUserDiDatabase;
   }
 
-  $: jadwalTerbaru = jadwalAbsen.length > 0 ? jadwalAbsen[jadwalAbsen.length - 1] : { totalHadir: 0 };
-  $: statistikAbsen = {
-    sudahAbsen: jadwalTerbaru.totalHadir || 0,
-    belumAbsen: totalUserDiDatabase - (jadwalTerbaru.totalHadir || 0)
+  // Hitung jumlah tiap status
+  $: statistikStatus = {
+    semua: jadwalAbsen.length,
+    hariIni: jadwalAbsen.filter(j => j.status === "Hari Ini").length,
+    terlewat: jadwalAbsen.filter(j => j.status === "Terlewat").length,
+    mendatang: jadwalAbsen.filter(j => j.status === "Mendatang").length
   };
 
-  function openAddJadwalModal() {
-    formJadwal = { judul: "", tanggal: "", jamMulai: "", jamSelesai: "" };
-    isAddJadwalModalOpen = true;
-  }
-
-  function closeAddJadwalModal() {
-    isAddJadwalModalOpen = false;
-  }
-
-  async function submitJadwalAbsen() {
-    if (!formJadwal.judul || !formJadwal.tanggal || !formJadwal.jamMulai || !formJadwal.jamSelesai) {
-      Swal.fire({ icon: "warning", title: "Data Belum Lengkap", text: "Pastikan semua kolom telah diisi!" });
-      return;
-    }
-
-    const payload = {
-      nama_kegiatan: formJadwal.judul,
-      tanggal_kegiatan: formJadwal.tanggal,
-      jam: `${formJadwal.jamMulai} - ${formJadwal.jamSelesai}`,
-      onlyTeam: false
-    };
-
-    try {
-      Swal.fire({
-        title: "Menyimpan data...",
-        text: "Mohon tunggu sebentar",
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
-      });
-
-      const response = await fetch(`http://localhost:9999/api/kegiatan/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload)
-      });
-
-      const result = await response.json();
-
-      if (response.status !== 200) {
-        throw new Error(result.message || "Gagal menyimpan data");
-      }
-
-      Swal.fire({
-        icon: "success",
-        title: "Jadwal Dibuat!",
-        text: "Absen baru telah berhasil dipublikasikan.",
-        timer: 1500,
-        showConfirmButton: false
-      });
-
-      closeAddJadwalModal();
-      await fetchKegiatanData();
-      
-    } catch (error) {
-      console.error('Error:', error);
-      Swal.fire({ 
-        icon: "error", 
-        title: "Gagal menyimpan jadwal!", 
-        text: error.message,
-        confirmButtonColor: "#0a4682" 
-      });
-    }
-  }
-
-  function bukaDetailAbsen(jadwal) {
+  async function bukaDetailAbsen(jadwal) {
     selectedJadwal = jadwal;
-    fetchDetailAbsen(jadwal.id);
+    await fetchDetailAbsen(jadwal.id);
   }
 
   function tutupDetailAbsen() {
@@ -332,8 +286,9 @@
       return;
     }
 
-    fetchKegiatanData();
-    fetchTotalUser();
+    Promise.all([fetchKegiatanData(), fetchTotalUser()]).then(() => {
+      fetchAllTotalHadir();
+    });
   });
 
   function handleLogout() {
@@ -348,6 +303,8 @@
       if (result.isConfirmed) {
         localStorage.removeItem("user_name");
         localStorage.removeItem("user_role");
+        localStorage.removeItem("token");
+        localStorage.removeItem("status");
         push("/");
       }
     });
@@ -375,11 +332,8 @@
   function closeDropdown() {
     isDropdownOpen = false;
   }
-
-
 </script>
 
-<!-- HTML sama persis dengan kode Anda, tidak perlu diubah -->
 <svelte:window bind:innerWidth />
 
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">
@@ -558,53 +512,54 @@
                 <p class="mt-2 text-gray-500">Memuat data...</p>
               </div>
             </div>
+          {:else if jadwalAbsen.length === 0}
+            <div class="p-8 bg-white border border-gray-100 shadow-sm rounded-2xl text-center">
+              <p class="text-gray-500">Belum ada jadwal absen.</p>
+            </div>
           {:else}
-            <div class="flex flex-col items-center justify-center gap-6 sm:flex-row">
-              <div class="flex items-center w-full sm:w-[320px] p-6 space-x-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
-                <div class="flex items-center justify-center w-16 h-16 text-white bg-[#4ade80] rounded-full shadow-lg shadow-green-200">
-                  <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                </div>
-                <div>
-                  <h2 class="text-4xl font-black text-gray-800">{statistikAbsen.sudahAbsen}</h2>
-                  <p class="text-sm font-medium text-gray-500">Sudah Absen</p>
-                </div>
-              </div>
-              <div class="flex items-center w-full sm:w-[320px] p-6 space-x-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
-                <div class="flex items-center justify-center w-16 h-16 text-white bg-[#f87171] rounded-full shadow-lg shadow-red-200">
-                  <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                </div>
-                <div>
-                  <h2 class="text-4xl font-black text-gray-800">{statistikAbsen.belumAbsen}</h2>
-                  <p class="text-sm font-medium text-gray-500">Belum Absen</p>
+            <!-- TAB Navigation -->
+            <div class="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
+              <div class="border-b border-gray-100">
+                <div class="flex flex-wrap">
+                  <button
+                    on:click={() => activeTab = "semua"}
+                    class="px-6 py-3 text-sm font-bold transition-all {activeTab === 'semua' ? 'text-[#0a4682] border-b-2 border-[#0a4682] bg-blue-50/30' : 'text-gray-500 hover:text-gray-700'}"
+                  >
+                    Semua ({statistikStatus.semua})
+                  </button>
+                  <button
+                    on:click={() => activeTab = "hariIni"}
+                    class="px-6 py-3 text-sm font-bold transition-all {activeTab === 'hariIni' ? 'text-[#0a4682] border-b-2 border-[#0a4682] bg-blue-50/30' : 'text-gray-500 hover:text-gray-700'}"
+                  >
+                    Hari Ini ({statistikStatus.hariIni})
+                  </button>
+                  <button
+                    on:click={() => activeTab = "mendatang"}
+                    class="px-6 py-3 text-sm font-bold transition-all {activeTab === 'mendatang' ? 'text-[#0a4682] border-b-2 border-[#0a4682] bg-blue-50/30' : 'text-gray-500 hover:text-gray-700'}"
+                  >
+                    Akan Datang ({statistikStatus.mendatang})
+                  </button>
+                  <button
+                    on:click={() => activeTab = "terlewat"}
+                    class="px-6 py-3 text-sm font-bold transition-all {activeTab === 'terlewat' ? 'text-[#0a4682] border-b-2 border-[#0a4682] bg-blue-50/30' : 'text-gray-500 hover:text-gray-700'}"
+                  >
+                    Terlewat ({statistikStatus.terlewat})
+                  </button>
                 </div>
               </div>
             </div>
 
+            <!-- List Jadwal -->
             <div class="p-8 bg-white border border-gray-100 shadow-sm rounded-2xl">
-              <div class="flex items-center justify-between pb-5 mb-8 border-b border-gray-100">
-                <h3 class="text-xl font-bold text-gray-800">Daftar Jadwal Absen</h3>
-              
-              </div>
-              
               <div class="space-y-12">
-                {#each jadwalAbsen as jadwal}
+                {#each filteredJadwal as jadwal}
                   <div class="flex flex-col gap-6">
                     <div class="flex items-start justify-between">
                       <div class="space-y-3">
                         <h4 class="text-lg font-extrabold text-gray-800">{jadwal.judul}</h4>
                         <div class="pl-6 space-y-1.5 text-sm font-medium text-gray-600">
-                          <p>• {jadwal.tanggal}</p>
+                          <p>• {jadwal.tanggalFormatted}</p>
                           <p>• {jadwal.waktu}</p>
-                        </div>
-                      </div>
-                      <div class="text-right space-y-3 min-w-[120px]">
-                        <h4 class="text-lg font-extrabold text-gray-800">Status</h4>
-                        <div class="space-y-1.5 text-sm font-medium text-gray-600">
-                          <p class="font-bold {jadwal.totalHadir > 0 ? 'text-green-600' : 'text-gray-400'}">
-                            {jadwal.totalHadir > 0 ? `${jadwal.totalHadir}/${totalUserDiDatabase}` : '-'}
-                          </p>
-                          <p>{jadwal.statusTanggal}</p>
-                          <!-- <p>{jadwal.statusWaktu}</p> -->
                         </div>
                       </div>
                     </div>
@@ -616,18 +571,19 @@
                       Cek Absen
                     </button>
                     
-                    {#if jadwal !== jadwalAbsen[jadwalAbsen.length - 1]}
+                    {#if jadwal !== filteredJadwal[filteredJadwal.length - 1]}
                       <hr class="mt-6 border-gray-100" />
                     {/if}
                   </div>
                 {:else}
-                  <p class="text-center text-gray-500">Belum ada jadwal absen dibuat.</p>
+                  <p class="text-center text-gray-500 py-8">Tidak ada jadwal dengan status ini.</p>
                 {/each}
               </div>
             </div>
           {/if}
 
         {:else}
+          <!-- Detail Absen -->
           <div class="space-y-6 animate-fade-in">
             <button on:click={tutupDetailAbsen} class="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-600 transition-colors bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
@@ -637,13 +593,16 @@
             <div>
               <h2 class="text-2xl font-black text-gray-800">{selectedJadwal.judul}</h2>
               <p class="mt-2 text-sm font-medium text-gray-500">
-                {selectedJadwal.tanggal} • {selectedJadwal.waktu}
+                {selectedJadwal.tanggalFormatted} • {selectedJadwal.waktu}
               </p>
             </div>
 
             <div class="overflow-hidden bg-white border border-gray-200 shadow-sm rounded-2xl">
               <div class="px-6 py-5 border-b border-gray-100">
                 <h3 class="text-lg font-bold text-gray-800">Status Absen</h3>
+                <p class="text-sm text-gray-500 mt-1">
+                  Total Hadir: {selectedJadwal.totalHadir}/{getTotalUserByType(selectedJadwal.onlyTeam)}
+                </p>
               </div>
 
               <div class="overflow-x-auto">
@@ -680,7 +639,7 @@
   </div>
 </div>
 
-
+<!-- Modal Lihat Detail Absen -->
 {#if isLihatModalOpen && selectedSiswaDetail && selectedJadwal}
   <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
     <div class="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-sm" on:click={closeLihatModal} aria-hidden="true"></div>
@@ -692,7 +651,8 @@
       <div class="p-8 md:p-10 space-y-8 overflow-y-auto max-h-[90vh]">
         <div>
           <h2 class="text-lg font-extrabold text-gray-800 pr-10">{selectedJadwal.judul}</h2>
-          <p class="mt-1 text-xs font-medium text-gray-500">{selectedJadwal.tanggal} • {selectedJadwal.waktu}</p>
+          <p class="mt-1 text-xs font-medium text-gray-500">{selectedJadwal.tanggalFormatted} • {selectedJadwal.waktu}</p>
+          <p class="mt-1 text-sm font-semibold text-[#0a2e52]">{selectedSiswaDetail.nama}</p>
         </div>
 
         {#if selectedSiswaDetail.jawaban}
@@ -718,7 +678,6 @@
                   alt="Bukti Absen" 
                   class="max-w-full h-auto object-cover"
                 />
-                
               </div>
             {:else}
               <div class="flex items-center justify-center w-full bg-gray-50 border border-gray-200 border-dashed rounded-xl h-44">

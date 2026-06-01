@@ -456,7 +456,7 @@
     Swal.fire({
       title: "Yakin ingin keluar?", icon: "warning", showCancelButton: true,
       confirmButtonColor: "#ef4444", cancelButtonColor: "#9ca3af", confirmButtonText: "Ya, Logout!",
-    }).then((r) => { if (r.isConfirmed) { localStorage.removeItem("user_name"); localStorage.removeItem("user_role"); push("/"); } });
+    }).then((r) => { if (r.isConfirmed) {   localStorage.clear()  ;push("/"); } });
   }
 
   let innerWidth = 0;

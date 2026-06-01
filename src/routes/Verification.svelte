@@ -86,6 +86,7 @@
         timer: 2000,
         showConfirmButton: false
       }).then(() => {
+      localStorage.setItem("status" , 'true')
         if (localStorage.getItem("role") === 'admin') {
            localStorage.setItem("status" , "true");
           push('/admin/beranda');

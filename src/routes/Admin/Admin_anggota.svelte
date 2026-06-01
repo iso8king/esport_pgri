@@ -12,6 +12,7 @@
   // API URL
   const API_URL = "http://localhost:9999/api/users/all";
   const TEAMS_API_URL = "http://localhost:9999/api/teams";
+  const STATISTIK_API_URL = "http://localhost:9999/api/statistik";
   
   let searchQuery = '';
   let selectedTeamFilter = '';
@@ -26,11 +27,11 @@
   });
 
   // Statistik
-  $: statistik = {
-    totalanggota: anggotaList.length,
-    playerDalamTeam: anggotaList.filter((orang) => orang.status === "Dalam Tim").length,
-    playerTidakDalamTeam: anggotaList.filter((orang) => orang.status === "Tidak Dalam Tim").length,
-    teamAktif: teamList.length,
+  let statistik = {
+    totalanggota: 0,
+    playerDalamTeam: 0,
+    playerTidakDalamTeam: 0,
+    teamAktif: 0,
   };
 
   let currentUserName = "Loading...";
@@ -59,12 +60,8 @@
     return roleMap[role] || role.toLowerCase();
   }
 
+  // Fetch list team dari backend
   async function fetchTeamList() {
-    const storedTeams = localStorage.getItem("team_list");
-    if (storedTeams) {
-      teamList = JSON.parse(storedTeams);
-      return;
-    }
     try {
       const response = await fetch(`${TEAMS_API_URL}/all`, {
         method: 'GET',
@@ -74,13 +71,38 @@
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const result = await response.json();
       teamList = result.data || [];
-      localStorage.setItem("team_list", JSON.stringify(teamList));
+      console.log("Team list:", teamList);
     } catch (error) {
       console.error("Error fetching team list:", error);
       teamList = [];
     }
   }
 
+  // Fetch statistik dari backend
+  async function fetchStatistik() {
+    try {
+      const response = await fetch(STATISTIK_API_URL, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const result = await response.json();
+      
+      if (result.data) {
+        statistik = {
+          totalanggota: result.data.allUser || 0,
+          playerDalamTeam: result.data.onTeam || 0,
+          playerTidakDalamTeam: result.data.notOnTeam || 0,
+          teamAktif: result.data.teamCount || teamList.length,
+        };
+      }
+    } catch (error) {
+      console.error("Error fetching statistik:", error);
+    }
+  }
+
+  // FETCH ANGGOTA - DIPERBAIKI TOTAL
   async function fetchAnggota() {
     isLoading = true;
     errorMessage = "";
@@ -92,24 +114,59 @@
       });
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const result = await response.json();
+      console.log("Response API:", result);
+      
       const users = result.data || [];
+      
       anggotaList = users.map(user => {
-        const userId = user.id || user.user_id || null;
-        const hasMember = user.member && user.member.length > 0;
-        const firstMember = hasMember ? user.member[0] : null;
-        const hasTeam = hasMember && firstMember.team !== null;
-        const rawRole = hasTeam ? firstMember.role : null;
-        const mappedRole = mapRoleToFrontend(rawRole);
+        // CEK MEMBER dengan BENAR
+        const hasTeam = user.member !== null && user.member !== undefined && user.member.team !== null;
+        
+        let teamName = "No Team";
+        let roleFrontend = "Belum Assign";
+        let status = "Tidak Dalam Tim";
+        
+        if (hasTeam && user.member.team) {
+          teamName = user.member.team.nama_tim || "No Team";
+          status = "Dalam Tim";
+          
+          if (user.member.role) {
+            roleFrontend = mapRoleToFrontend(user.member.role) || "Belum Assign";
+          }
+        }
+        
+        // Cari teamId dari teamList berdasarkan nama tim
+        let teamId = null;
+        if (teamName !== "No Team") {
+          const foundTeam = teamList.find(t => t.nama_tim === teamName);
+          teamId = foundTeam ? foundTeam.id : null;
+        }
+        
         return {
-          userId: userId,
+          userId: user.id,
           nama: user.nama,
-          team: hasTeam && firstMember.team.nama_tim ? firstMember.team.nama_tim : "No Team",
-          teamId: hasTeam && firstMember.team.id ? firstMember.team.id : null,
-          position: mappedRole,
-          status: hasTeam ? "Dalam Tim" : "Tidak Dalam Tim",
-          memberData: user.member || []
+          username: user.username,
+          team: teamName,
+          teamId: teamId,
+          position: roleFrontend,
+          status: status,
         };
       });
+      
+      console.log("Anggota list:", anggotaList);
+      
+      // Update statistik dari data yang sudah diproses
+      const dalamTim = anggotaList.filter(a => a.status === "Dalam Tim").length;
+      const tidakDalamTim = anggotaList.filter(a => a.status === "Tidak Dalam Tim").length;
+      const uniqueTeams = [...new Set(anggotaList.filter(a => a.team !== "No Team").map(a => a.team))];
+      
+      statistik = {
+        totalanggota: anggotaList.length,
+        playerDalamTeam: dalamTim,
+        playerTidakDalamTeam: tidakDalamTim,
+        teamAktif: uniqueTeams.length
+      };
+      
     } catch (error) {
       console.error("Error fetching anggota:", error);
       errorMessage = "Gagal memuat data anggota. Silakan coba lagi.";
@@ -120,6 +177,17 @@
   }
 
   async function removeFromTeam(userId, teamId, userName, teamName) {
+    // Validasi teamId
+    if (!teamId) {
+      Swal.fire({ 
+        icon: 'error', 
+        title: 'Gagal!', 
+        text: `ID Tim tidak ditemukan untuk ${teamName}. Silakan refresh halaman.`, 
+        confirmButtonColor: "#ef4444" 
+      });
+      return;
+    }
+    
     const result = await Swal.fire({
       title: "Hapus dari Tim?",
       text: `Apakah Anda yakin ingin menghapus ${userName} dari tim ${teamName}?`,
@@ -131,6 +199,7 @@
       cancelButtonText: "Batal"
     });
     if (!result.isConfirmed) return;
+    
     try {
       const response = await fetch(`${TEAMS_API_URL}/${teamId}/remove?userId=${userId}`, {
         method: 'DELETE',
@@ -138,8 +207,14 @@
         headers: { 'Authorization': `Bearer ${localStorage.getItem("token")}` }
       });
       if (!response.ok) throw new Error("Gagal menghapus anggota dari tim");
+      
       Swal.fire({ icon: "success", title: "Berhasil!", text: `${userName} berhasil dihapus dari tim ${teamName}`, timer: 1500, showConfirmButton: false });
-      await fetchAnggota();
+      
+      // Refresh data dengan urutan yang benar
+      await fetchTeamList();  // Refresh team list dulu
+      await fetchAnggota();   // Baru fetch anggota
+      await fetchStatistik(); // Terakhir statistik
+      
     } catch (error) {
       console.error("Error removing member:", error);
       Swal.fire({ icon: "error", title: "Gagal!", text: error.message || "Gagal menghapus anggota dari tim.", confirmButtonColor: "#ef4444" });
@@ -157,10 +232,13 @@
         closeEditModal();
         return;
       }
+      
       const selectedTeam = teamList.find(team => team.nama_tim === formData.team);
       if (!selectedTeam) throw new Error("Team tidak ditemukan");
+      
       const backendRole = mapRoleToBackend(formData.position);
       const bodyData = { userId: formData.userId, role: backendRole };
+      
       const response = await fetch(`${TEAMS_API_URL}/${selectedTeam.id}/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem("token")}` },
@@ -168,9 +246,15 @@
         body: JSON.stringify(bodyData)
       });
       if (!response.ok) throw new Error("Gagal update data");
+      
       closeEditModal();
       Swal.fire({ icon: "success", title: "Berhasil!", text: `Anggota berhasil ditambahkan ke team ${formData.team} dengan role ${formData.position}`, timer: 1500, showConfirmButton: false });
+      
+      // Refresh data
+      await fetchTeamList();
       await fetchAnggota();
+      await fetchStatistik();
+      
     } catch (error) {
       console.error("Error updating anggota:", error);
       Swal.fire({ icon: "error", title: "Gagal!", text: error.message || "Gagal memperbarui data.", confirmButtonColor: "#ef4444" });
@@ -189,12 +273,13 @@
         credentials: 'include'
       });
       if (!response.ok) throw new Error("Gagal menambah team");
-      const result = await response.json();
-      const newTeam = result.data;
-      teamList = [...teamList, newTeam];
-      localStorage.setItem("team_list", JSON.stringify(teamList));
+      
       closeModal();
       Swal.fire({ icon: "success", title: "Berhasil!", text: `Team "${namaTeam}" berhasil ditambahkan.`, timer: 1500, showConfirmButton: false });
+      
+      await fetchTeamList();
+      await fetchStatistik();
+      
     } catch (error) {
       console.error("Error adding team:", error);
       Swal.fire({ icon: "error", title: "Gagal!", text: "Gagal menambahkan team. Silakan coba lagi.", confirmButtonColor: "#ef4444" });
@@ -207,20 +292,25 @@
     selectedRoleFilter = '';
   }
 
-  onMount(() => {
+  onMount(async () => {
     const name = localStorage.getItem("user_name");
     if (name) currentUserName = name;
     else push("/");
+    
     if (localStorage.getItem("role") !== "admin") {
       Swal.fire({ icon: 'error', title: 'Unauthorized', text: 'Redirecting......', confirmButtonColor: '#0b5ba2' }).then(() => push('/user/absensi'));
       return;
     }
+    
     const userStatus = localStorage.getItem("status");
     if (!userStatus) {
       Swal.fire({ icon: 'warning', title: 'Belum Verifikasi', text: 'Redirecting......', confirmButtonColor: '#0b5ba2' }).then(() => push('/verification'));
       return;
     }
-    Promise.all([fetchTeamList(), fetchAnggota()]);
+    
+    // Fetch data dengan urutan yang benar
+    await fetchTeamList();
+    await Promise.all([fetchAnggota(), fetchStatistik()]);
   });
 
   function handleLogout() {
@@ -237,7 +327,8 @@
         localStorage.removeItem("user_role");
         localStorage.removeItem("token");
         localStorage.removeItem("status");
-        localStorage.removeItem("team_list");
+        localStorage.removeItem("user_id");
+        localStorage.removeItem("tim");
         push("/");
       }
     });
@@ -282,6 +373,7 @@
   function closeEditModal() { isEditModalOpen = false; }
 </script>
 
+<!-- HTML section - tetap sama seperti kode Anda -->
 <svelte:window bind:innerWidth />
 
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">
@@ -450,7 +542,7 @@
               </div>
               
               <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <input type="text" bind:value={searchQuery} placeholder="Cari nama anggota..." class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+                <input type="text" bind:value={searchQuery} placeholder=" Cari nama anggota..." class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
                 
                 <div class="relative">
                   <select bind:value={selectedTeamFilter} class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 appearance-none cursor-pointer bg-white">
@@ -496,7 +588,7 @@
                 <thead class="sticky top-0 z-10 outline outline-1 outline-gray-100 bg-gray-50">
                   <tr class="text-sm text-gray-500 border-b border-gray-100 bg-gray-50">
                     <th class="px-6 py-4 font-semibold whitespace-nowrap">Nama</th>
-                    <th class="px-6 py-5 font-semibold whitespace-nowrap">Username</th>
+                    <th class="px-6 py-4 font-semibold whitespace-nowrap">Username</th>
                     <th class="px-6 py-4 font-semibold whitespace-nowrap">Team</th>
                     <th class="px-6 py-4 font-semibold whitespace-nowrap">Role</th>
                     <th class="px-6 py-4 font-semibold whitespace-nowrap">Status</th>
@@ -549,7 +641,7 @@
                   
                   {#if filterAnggotaList.length === 0}
                     <tr>
-                      <td colspan="5" class="py-8 text-center text-gray-400 whitespace-nowrap">
+                      <td colspan="6" class="py-8 text-center text-gray-400 whitespace-nowrap">
                         Tidak ada anggota yang cocok dengan filter yang dipilih.
                         <button on:click={resetFilters} class="ml-2 text-blue-600 hover:underline">Reset Filter</button>
                       </td>
@@ -636,3 +728,14 @@
   </div>
 </div>
 {/if}
+
+<style>
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+</style>
