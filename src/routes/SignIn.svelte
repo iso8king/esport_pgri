@@ -79,7 +79,7 @@
 
 <div class="min-h-screen bg-gray-700 flex items-center justify-center px-4">
   <div class="w-full max-w-md">
-  <img src="src/assets/bglogin.jpg" alt="background" class="absolute inset-0 w-full h-full object-cover opacity-20">
+  <img src="src/assets/bg-login.jpg" alt="background" class="absolute inset-0 w-full h-full object-cover opacity-20">
     <div class="border border-gray-200 bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl overflow-hidden relative z-10">
       
       <div class="text-center px-6 pt-8 pb-2">

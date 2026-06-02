@@ -82,10 +82,10 @@
       
       <div class="text-center md:text-left text-white">
         <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4">
-          Lorem Ipsum Dolor <br class="hidden md:block"/> Sit Amet
+          E-Sports <br class="hidden md:block"/> Tournament
         </h1>
         <p class="text-blue-200 text-xs sm:text-sm md:text-base max-w-sm mx-auto md:mx-0">
-          lorem ipsum dolor sit amet blabla tri inata
+          selamat datang di website resmi e-sports tournament 
         </p>
       </div>
 
