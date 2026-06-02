@@ -252,7 +252,12 @@
         {/if}
       </div>
     </header>
+    <main class="flex-1 p-10 overflow-x-hidden overflow-y-auto bg-gray-50">
+                <div class="p-6 bg-white border border-gray-100 shadow-sm sm:p-8 rounded-2xl">
+            <p class="text-base font-semibold text-gray-400 text-center">Fitur Analisis sedang dalam pengembangan.</p>
+          </div>
+    </main>
+    
   </div> 
-
     
 </div> 

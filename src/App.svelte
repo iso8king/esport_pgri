@@ -15,6 +15,7 @@
     import User_absensi from './routes/User/User_absensi.svelte';
     import User_kegiatan from './routes/User/User_kegiatan.svelte';
     import User_setting from './routes/User/User_setting.svelte';
+    import User_analisis from './routes/User/User_analisis.svelte';
 
 
     const routes = {
@@ -35,6 +36,7 @@
         '/user/absensi': User_absensi,
         '/user/kegiatan': User_kegiatan,
         '/user/settings': User_setting,
+        '/user/analisis': User_analisis,
 
         //'/user': Home,
         //'/admin': Admin,
