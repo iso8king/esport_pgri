@@ -577,7 +577,6 @@
   }
 </script>
 
-<!-- SVELTE HTML (sama seperti sebelumnya, tidak berubah) -->
 <svelte:window bind:innerWidth />
 
 {#if isLoading}
