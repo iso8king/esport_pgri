@@ -57,7 +57,7 @@
     console.log(code);
 
     try {
-          const response = await fetch("http://localhost:9999/api/users/verify", {
+          const response = await fetch("/api/users/verify", {
             method : "POST",
             headers: {
           'Content-Type': 'application/json'

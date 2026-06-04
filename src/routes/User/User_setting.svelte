@@ -100,7 +100,7 @@
 
   async function sendOtpEmail() {
     try {
-      const response = await fetch("http://localhost:9999/api/users/request/otp", {
+      const response = await fetch("/api/users/request/otp", {
         method: "POST",
         credentials: 'include'
       });
@@ -132,7 +132,7 @@
   // Verifikasi OTP
   async function verifyOtp(otpCode) {
     try {
-      const response = await fetch("http://localhost:9999/api/users/verify", {
+      const response = await fetch("/api/users/verify", {
         method: "POST",
         headers: {
           'Content-Type': 'application/json'
@@ -174,7 +174,7 @@
   // Update profile ke server
   async function updateProfileToServer(updatedData) {
     try {
-      const response = await fetch("http://localhost:9999/api/users/updateprofile", {
+      const response = await fetch("/api/users/updateprofile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedData),
@@ -198,7 +198,7 @@
   // Update password ke server
   async function updatePasswordToServer(passwordData) {
     try {
-      const response = await fetch("http://localhost:9999/api/users/update/password", {
+      const response = await fetch("/api/users/update/password", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

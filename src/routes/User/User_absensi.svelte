@@ -86,7 +86,7 @@
     try {
       const userId = localStorage.getItem("user_id");
       
-      const response = await fetch(`http://localhost:9999/api/absen/get/complete?user_id=${userId}`, {
+      const response = await fetch(`/api/absen/get/complete?user_id=${userId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -137,7 +137,7 @@
         return;
       }
 
-      const response = await fetch(`http://localhost:9999/api/kegiatan?user_id=${userId}`, {
+      const response = await fetch(`/api/kegiatan?user_id=${userId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -236,7 +236,7 @@
   // Kirim absen ke backend
   async function submitAbsenToBackend(kegiatanId, formData) {
     try {
-      const response = await fetch(`http://localhost:9999/api/absen/${kegiatanId}/create`, {
+      const response = await fetch(`/api/absen/${kegiatanId}/create`, {
         method: 'POST',
         body: formData,
         credentials: 'include'

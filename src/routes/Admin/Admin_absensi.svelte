@@ -34,7 +34,7 @@
   async function fetchKegiatanData() {
     isLoading = true;
     try {
-      const response = await fetch('http://localhost:9999/api/kegiatan/', {
+      const response = await fetch('/api/kegiatan/', {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -82,7 +82,7 @@
   async function fetchAllTotalHadir() {
     for (const jadwal of jadwalAbsen) {
       try {
-        const response = await fetch(`http://localhost:9999/api/absen/${jadwal.id}/get`, {
+        const response = await fetch(`/api/absen/${jadwal.id}/get`, {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -105,7 +105,7 @@
   // Fungsi untuk mengambil total user dari database
   async function fetchTotalUser() {
     try {
-      const response = await fetch('http://localhost:9999/api/statistik', {
+      const response = await fetch('/api/statistik', {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -129,7 +129,7 @@
   // Fungsi untuk mengambil detail absen berdasarkan kegiatan
   async function fetchDetailAbsen(kegiatanId) {
     try {
-      const response = await fetch(`http://localhost:9999/api/absen/${kegiatanId}/get`, {
+      const response = await fetch(`/api/absen/${kegiatanId}/get`, {
         method: 'GET',
         credentials: 'include',
         headers: {

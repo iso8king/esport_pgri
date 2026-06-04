@@ -40,7 +40,7 @@
 async function fetchJadwalData() {
   isLoading = true;
   try {
-    const response = await fetch('http://localhost:9999/api/kegiatan/', {
+    const response = await fetch('/api/kegiatan/', {
       method: 'GET',
       credentials: 'include',
       headers: {
@@ -144,7 +144,7 @@ function formatDate(dateString) {
         }
       });
 
-      const response = await fetch(`http://localhost:9999/api/kegiatan/create`, {
+      const response = await fetch(`/api/kegiatan/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
