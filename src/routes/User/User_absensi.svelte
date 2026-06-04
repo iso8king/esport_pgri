@@ -516,7 +516,6 @@
   });
 </script>
 
-<!-- SVELTE HTML -->
 <svelte:window bind:innerWidth />
 
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">
@@ -722,7 +721,7 @@
                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" /></svg>
               </div>
               <h3 class="text-[15px] font-bold text-gray-700 mb-6">Analisis Match Kamu</h3>
-              <button class="flex items-center justify-center w-10 h-10 bg-[#0a2e52] text-white rounded-full hover:bg-blue-900 transition-colors shadow-sm">
+              <button on:click={() => {window.location.href = '#/user/analisis'; }} class="flex items-center justify-center w-10 h-10 bg-[#0a2e52] text-white rounded-full hover:bg-blue-900 transition-colors shadow-sm">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
               </button>
             </div>

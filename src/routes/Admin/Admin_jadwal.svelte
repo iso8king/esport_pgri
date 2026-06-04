@@ -267,7 +267,6 @@ function formatDate(dateString) {
   }
 </script>
 
-<!-- HTML section - tambahkan loading state -->
 <svelte:window bind:innerWidth />
 
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">
@@ -614,7 +613,6 @@ function formatDate(dateString) {
             />
           </div>
 
-          <!-- Checkbox untuk "Hanya untuk yang memiliki tim?" -->
           <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <input
               type="checkbox"

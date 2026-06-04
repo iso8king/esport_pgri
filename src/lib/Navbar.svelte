@@ -19,27 +19,27 @@
       <li>
         <button 
         on:click={() => scrollToSection('home')}
-        class="flex items-center gap-1 hover:text-yellow-300 transition-colors">
+        class="flex items-center gap-1 hover:text-blue-200 transition-colors">
           Home
         </button>
       </li>
       <li>
         <button 
         on:click={() => scrollToSection('gallery')}
-        class="flex items-center gap-1 hover:text-yellow-300 transition-colors">
+        class="flex items-center gap-1 hover:text-blue-200 transition-colors">
           Gallery
         </button>
       </li>
       <li>
         <button 
         on:click={() => scrollToSection('about')}  
-        class="flex items-center gap-1 hover:text-yellow-300 transition-colors">
+        class="flex items-center gap-1 hover:text-blue-200 transition-colors">
           About Us
         </button>
       </li>
       <li>
-        <button class="flex items-center gap-1 hover:text-yellow-300 transition-colors">
-          <a href="#contact" class="text-white hover:text-yellow-300">Contact</a>
+        <button class="flex items-center gap-1 hover:text-blue-200 transition-colors">
+          <a href="#contact" class="text-white hover:text-blue-200">Contact</a>
         </button>
       </li>
     </ul>

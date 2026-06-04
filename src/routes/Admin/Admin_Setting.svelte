@@ -25,6 +25,7 @@
 
   let selectedGalleryFile = null;
   let galleryFilePreview = null;
+  let galleryTitle = "";
   let galleryDescription = "";
   let isUploadingGallery = false;
   let isDeletingGalleryId = null;
@@ -261,6 +262,16 @@
   }
 
   function handleGalleryFileChange(event) {
+    if (websiteSettings.gallery && websiteSettings.gallery.length >= 5) {
+      Swal.fire({
+        icon: "warning",
+        title: "Batas Maksimal Tercapai",
+        text: "Maksimal jumlah foto di galeri adalah 5 foto. Silakan hapus foto yang ada terlebih dahulu untuk menambahkan yang baru.",
+        confirmButtonColor: "#0b5ba2"
+      });
+      event.target.value = "";
+      return;
+    }
     const file = event.target.files[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
@@ -293,6 +304,15 @@
   }
 
   async function uploadGalleryItem() {
+    if (websiteSettings.gallery && websiteSettings.gallery.length >= 5) {
+      Swal.fire({
+        icon: "warning",
+        title: "Batas Maksimal Tercapai",
+        text: "Maksimal jumlah foto di galeri adalah 5 foto. Silakan hapus foto yang ada terlebih dahulu untuk menambahkan yang baru.",
+        confirmButtonColor: "#0b5ba2"
+      });
+      return;
+    }
     if (!selectedGalleryFile) {
       Swal.fire({ icon: "warning", title: "Pilih File", text: "Pilih file gambar galeri terlebih dahulu!", confirmButtonColor: "#0b5ba2" });
       return;
@@ -301,6 +321,7 @@
     isUploadingGallery = true;
     const formData = new FormData();
     formData.append("galleryItem", selectedGalleryFile);
+    formData.append("title", galleryTitle || "Foto Kegiatan");
     formData.append("description", galleryDescription || "Deskripsi Galeri");
 
     try {
@@ -331,6 +352,7 @@
         websiteSettings = result.data;
         selectedGalleryFile = null;
         galleryFilePreview = null;
+        galleryTitle = "";
         galleryDescription = "";
       } else {
         throw new Error(result.errors || "Gagal menambahkan foto");
@@ -846,6 +868,17 @@
                     
                     <div class="space-y-3">
                       <div>
+                        <label for="galleryTitle" class="block mb-1 text-xs font-semibold text-gray-700">Judul Foto (Opsional)</label>
+                        <input 
+                          id="galleryTitle" 
+                          type="text"
+                          bind:value={galleryTitle} 
+                          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" 
+                          placeholder="Contoh: Foto Kegiatan" 
+                        />
+                      </div>
+                      
+                      <div>
                         <label for="galleryDescription" class="block mb-1 text-xs font-semibold text-gray-700">Deskripsi Foto (Opsional)</label>
                         <textarea 
                           id="galleryDescription" 
@@ -909,11 +942,10 @@
                             <div class="aspect-[4/3] bg-gray-50 border-b border-gray-100 overflow-hidden relative">
                               <img src={`http://localhost:9999/assets/${item.image}`} alt={item.description || item.title || "Foto Galeri"} class="w-full h-full object-cover" />
                               
-                              <!-- Floating Delete Button -->
                               <button 
                                 on:click={() => deleteGalleryItem(item.id)}
                                 disabled={isDeletingGalleryId === item.id}
-                                class="absolute top-2 right-2 p-1.5 bg-white hover:bg-red-50 text-red-500 hover:text-red-700 rounded-lg shadow-md transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer disabled:opacity-50"
+                                class="absolute top-2 right-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-md transition-all opacity-90 hover:opacity-100 cursor-pointer disabled:opacity-50"
                                 title="Hapus foto"
                               >
                                 <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -922,14 +954,18 @@
                               </button>
                             </div>
                             <!-- Title info -->
-                            <div class="p-3.5 flex justify-between items-center">
-                              <span class="text-xs font-bold text-gray-700 truncate pr-2">{item.description || item.title || "Deskripsi Galeri"}</span>
+                            <div class="p-3.5 flex justify-between items-center bg-gray-50 border-t border-gray-100">
+                              <div class="flex flex-col min-w-0 pr-4">
+                                <span class="text-xs font-bold text-gray-800 truncate">{item.title || "Foto Kegiatan"}</span>
+                                <span class="text-[10px] text-gray-500 truncate mt-0.5">{item.description || "Deskripsi Galeri"}</span>
+                              </div>
                               <button 
                                 on:click={() => deleteGalleryItem(item.id)}
                                 disabled={isDeletingGalleryId === item.id}
-                                class="text-red-500 hover:text-red-700 transition-colors sm:hidden"
+                                class="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-md transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                                title="Hapus foto"
                               >
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                   <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                               </button>

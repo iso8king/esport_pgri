@@ -373,7 +373,6 @@
   function closeEditModal() { isEditModalOpen = false; }
 </script>
 
-<!-- HTML section - tetap sama seperti kode Anda -->
 <svelte:window bind:innerWidth />
 
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">

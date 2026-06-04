@@ -30,6 +30,7 @@
   let isLoadingOtp = false;
   let countdown = 0;
   let countdownInterval = null;
+  let isSendingOtp = false;
 
   // Helper function untuk cek apakah user punya tim
   function hasTeam() {
@@ -99,6 +100,7 @@
   }
 
   async function sendOtpEmail() {
+    isSendingOtp = true;
     try {
       const response = await fetch("/api/users/request/otp", {
         method: "POST",
@@ -106,19 +108,13 @@
       });
       const data = await response.json();
       
-      Swal.fire({
-        icon: 'success',
-        title: 'Kode OTP Dikirim!',
-        text: `Kode verifikasi telah dikirim ke ${profile.email}`,
-        confirmButtonColor: '#0b5ba2',
-        timer: 2000,
-        showConfirmButton: false
-      });
+      Swal.close();
       
       startCountdown(60);
       return true;
     } catch (error) {
       console.error("Error sending OTP:", error);
+      Swal.close();
       Swal.fire({
         icon: 'error',
         title: 'Gagal Kirim OTP',
@@ -126,6 +122,8 @@
         confirmButtonColor: '#ef4444'
       });
       return false;
+    } finally {
+      isSendingOtp = false;
     }
   }
 
@@ -278,6 +276,7 @@
   }
   
   async function saveProfile() {
+    if (isSendingOtp) return;
     if (!profile.nama.trim()) {
       Swal.fire({ icon: "warning", title: "Nama tidak boleh kosong!", confirmButtonColor: "#0a4682" });
       return;
@@ -315,6 +314,7 @@
   }
   
   async function savePassword() {
+    if (isSendingOtp) return;
     if (!password.current || !password.new || !password.confirm) {
       Swal.fire({ icon: "warning", title: "Lengkapi semua field!", confirmButtonColor: "#0a4682" });
       return;
@@ -614,9 +614,15 @@
           
           <div class="flex justify-end pt-2">
             <button on:click={saveProfile} 
-              class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 {hasTeam() ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
+              disabled={isSendingOtp}
+              class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 {hasTeam() ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
             >
-              Simpan Profil
+              {#if isSendingOtp}
+                <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Menghubungkan...
+              {:else}
+                Simpan Profil
+              {/if}
             </button>
           </div>
         </div>
@@ -651,9 +657,15 @@
           
           <div class="flex justify-end pt-2">
             <button on:click={savePassword} 
-              class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 {hasTeam() ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
+              disabled={isSendingOtp}
+              class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 {hasTeam() ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
             >
-              Ubah Password
+              {#if isSendingOtp}
+                <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Menghubungkan...
+              {:else}
+                Ubah Password
+              {/if}
             </button>
           </div>
         </div>
