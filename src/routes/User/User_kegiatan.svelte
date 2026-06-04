@@ -683,7 +683,7 @@
                         <span class="px-2 py-0.5 text-[10px] font-bold text-blue-600 bg-blue-100 rounded-full">Team Only</span>
                       {/if}
                     </div>
-                    <div class="flex flex-col gap-1 pl-4 text-sm font-medium text-gray-600 sm:pl-6">
+                    <div class="flex flex-col gap-1 pl-0 text-sm font-medium text-gray-600 sm:pl-6">
                       <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-gray-400 rounded-full shrink-0"></span>{kegiatan.tanggal}</div>
                       <div class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-gray-400 rounded-full shrink-0"></span>{kegiatan.waktu}</div>
                     </div>
