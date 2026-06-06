@@ -139,7 +139,7 @@
             createdAt: item.createdAt,
             deskripsi: item.deskripsi || null,
             mood: item.mood || null,
-            bukti_url: item.bukti_url || null
+            bukti_url: item.bukti ? `http://localhost:9999/assets/${item.bukti}` : null
           });
         });
       }
@@ -446,13 +446,16 @@
 
     if (result.success) {
       const responseData = result.data;
-      
+      const createdAbsen = responseData?.data || responseData;
       const nowIso = new Date().toISOString();
+      const buktiFilename = createdAbsen?.bukti;
+      const buktiUrl = buktiFilename ? `http://localhost:9999/assets/${buktiFilename}` : null;
+      
       absenDataMap.set(selectedAbsen.id, {
-        createdAt: responseData?.createdAt || nowIso,
+        createdAt: createdAbsen?.createdAt || nowIso,
         deskripsi: formAbsen.pelajaran,
         mood: formAbsen.mood,
-        bukti_url: responseData?.bukti_url || null
+        bukti_url: buktiUrl
       });
       
       // Update UI
@@ -467,6 +470,7 @@
             statusWaktu: formatWaktu(absenData.createdAt),
             pelajaran: formAbsen.pelajaran,
             mood: formAbsen.mood,
+            bukti_url: absenData.bukti_url,
             createdAt: absenData.createdAt,
             isButtonDisabled: true
           };
@@ -827,7 +831,7 @@
         {#if selectedKegiatan.bukti_url}
           <div class="p-4 border rounded-xl bg-gray-50">
             <p class="mb-2 text-xs font-bold tracking-wide text-gray-500 uppercase">Bukti Kegiatan</p>
-            <img src={selectedKegiatan.bukti_url} alt="Bukti" class="max-w-full rounded-lg" />
+            <img src={selectedKegiatan.bukti_url} alt="Bukti Kegiatan" class="max-w-full rounded-lg border border-gray-200" />
           </div>
         {/if}
       </div>

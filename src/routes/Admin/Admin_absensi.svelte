@@ -600,11 +600,22 @@
             </div>
 
             <div class="overflow-hidden bg-white border border-gray-200 shadow-sm rounded-2xl">
-              <div class="px-6 py-5 border-b border-gray-100">
-                <h3 class="text-lg font-bold text-gray-800">Status Absen</h3>
-                <p class="text-sm text-gray-500 mt-1">
-                  Total Hadir: {selectedJadwal.totalHadir}/{getTotalUserByType(selectedJadwal.onlyTeam)}
-                </p>
+              <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center">
+                <div>
+                  <h3 class="text-lg font-bold text-gray-800">Status Absen</h3>
+                  <p class="text-sm text-gray-500 mt-1">
+                    Total Hadir: {selectedJadwal.totalHadir}/{getTotalUserByType(selectedJadwal.onlyTeam)}
+                  </p>
+                </div>
+                <button 
+                  on:click={exportToExcel}
+                  class="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white transition-colors bg-green-600 rounded-lg shadow-sm hover:bg-green-700 cursor-pointer"
+                >
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Export Excel
+                </button>
               </div>
 
               <div class="overflow-x-auto">
