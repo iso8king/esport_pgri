@@ -20,6 +20,14 @@
   let profile = { nama: "", email: "", role: "User", team: "", game_id: "", server_id: "" };
   let password = { current: "", new: "", confirm: "" };
   
+  let initialProfile = { nama: "", email: "", game_id: "", server_id: "" };
+
+  $: isProfileUnchanged = 
+    profile.nama === initialProfile.nama &&
+    profile.email === initialProfile.email &&
+    profile.game_id === initialProfile.game_id &&
+    profile.server_id === initialProfile.server_id;
+  
   // State untuk modal OTP
   let isOtpModalOpen = false;
   let otpCodes = ['', '', '', ''];
@@ -56,6 +64,14 @@
       profile.game_id = localStorage.getItem("user_game_id") || "";
       profile.server_id = localStorage.getItem("user_server_id") || "";
       profile.team = getTeamName(); // Gunakan fungsi helper
+      
+      // Simpan data profil awal
+      initialProfile = {
+        nama: profile.nama,
+        email: profile.email,
+        game_id: profile.game_id,
+        server_id: profile.server_id
+      };
     } else {
       push("/");
     }
@@ -375,6 +391,7 @@
         updateSuccess = await updateProfileToServer(pendingProfileData);
         if (updateSuccess) {
           currentUserName = pendingProfileData.nama;
+          initialProfile = { ...pendingProfileData };
         }
       } else if (otpAction === 'password') {
         updateSuccess = await updatePasswordToServer(pendingPasswordData);
@@ -614,7 +631,7 @@
           
           <div class="flex justify-end pt-2">
             <button on:click={saveProfile} 
-              disabled={isSendingOtp}
+              disabled={isSendingOtp || isProfileUnchanged}
               class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 {hasTeam() ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
             >
               {#if isSendingOtp}
