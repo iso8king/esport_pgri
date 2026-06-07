@@ -29,7 +29,7 @@
     errorMessage = "";
     
     try {
-      const response = await fetch('http://localhost:9999/api/statistik', {
+      const response = await fetch('/api/statistik', {
         method: 'GET',
         credentials: 'include',
         headers: {

@@ -15,7 +15,7 @@
 
   onMount(async () => {
     try {
-      const res = await fetch("http://localhost:9999/api/settings");
+      const res = await fetch("/api/settings");
       if (res.ok) {
         const json = await res.json();
         if (json.data) {
@@ -103,7 +103,7 @@
       </div>
 
       <div class="w-full aspect-video md:aspect-[4/3] bg-[#0c2e4e] rounded-2xl shadow-2xl border-4 border-white/10 flex items-center justify-center overflow-hidden max-w-xl mx-auto md:max-w-none transform hover:scale-[1.02] transition-all duration-500 shadow-blue-950/50">
-        <img src={settings.heroImage ? `http://localhost:9999/assets/${settings.heroImage}` : "src/assets/bglogin.jpg"} alt="Hero E-Sports" class="w-full h-full object-cover" />
+        <img src={settings.heroImage ? `/assets/${settings.heroImage}` : "src/assets/bglogin.jpg"} alt="Hero E-Sports" class="w-full h-full object-cover" />
       </div>
 
     </div>
@@ -146,7 +146,7 @@
       </div>
 
       <div class="w-full aspect-video md:aspect-[4/3] bg-slate-100 rounded-2xl shadow-xl border border-slate-200 flex items-center justify-center overflow-hidden max-w-xl mx-auto md:max-w-none transform hover:scale-[1.02] transition-all duration-500 shadow-slate-200/40">
-        <img src={settings.aboutImage ? `http://localhost:9999/assets/${settings.aboutImage}` : "src/assets/bglogin.jpg"} alt="Background About" class="w-full h-full object-cover"/>
+        <img src={settings.aboutImage ? `/assets/${settings.aboutImage}` : "src/assets/bglogin.jpg"} alt="Background About" class="w-full h-full object-cover"/>
       </div>
 
     </div>
@@ -189,7 +189,7 @@
                   <span class="text-blue-200/70 text-xs px-4 leading-relaxed line-clamp-2">{item.description}</span>
                 </div>
               {:else}
-                <img src={`http://localhost:9999/assets/${item.image}`} alt={item.description || item.title || "Foto Galeri"} class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
+                <img src={`/assets/${item.image}`} alt={item.description || item.title || "Foto Galeri"} class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"/>
                 
                 <!-- Hover Overlay dengan Deskripsi -->
                 <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-6 text-left select-none">

@@ -10,9 +10,9 @@
   let teamList = [];
   
   // API URL
-  const API_URL = "http://localhost:9999/api/users/all";
-  const TEAMS_API_URL = "http://localhost:9999/api/teams";
-  const STATISTIK_API_URL = "http://localhost:9999/api/statistik";
+  const API_URL = "/api/users/all";
+  const TEAMS_API_URL = "/api/teams";
+  const STATISTIK_API_URL = "/api/statistik";
   
   let searchQuery = '';
   let selectedTeamFilter = '';

@@ -34,7 +34,7 @@
 
   async function fetchWebsiteSettings() {
     try {
-      const res = await fetch("http://localhost:9999/api/settings");
+      const res = await fetch("/api/settings");
       if (res.ok) {
         const result = await res.json();
         if (result.data) {
@@ -102,7 +102,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetch("http://localhost:9999/api/settings/hero", {
+      const response = await fetch("/api/settings/hero", {
         method: "POST",
         credentials: "include",
         body: formData
@@ -188,7 +188,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetch("http://localhost:9999/api/settings/about-image", {
+      const response = await fetch("/api/settings/about-image", {
         method: "POST",
         credentials: "include",
         body: formData
@@ -229,7 +229,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetch("http://localhost:9999/api/settings/about-text", {
+      const response = await fetch("/api/settings/about-text", {
         method: "PATCH",
         credentials: "include",
         headers: {
@@ -332,7 +332,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetch("http://localhost:9999/api/settings/gallery", {
+      const response = await fetch("/api/settings/gallery", {
         method: "POST",
         credentials: "include",
         body: formData
@@ -385,7 +385,7 @@
             didOpen: () => Swal.showLoading()
           });
 
-          const response = await fetch(`http://localhost:9999/api/settings/gallery/${id}`, {
+          const response = await fetch(`/api/settings/gallery/${id}`, {
             method: "DELETE",
             credentials: "include"
           });
@@ -713,7 +713,7 @@
                         <img src={filePreview} alt="Pratinjau Baru" class="w-full h-full object-cover" />
                         <span class="absolute top-3 left-3 bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">Pratinjau Gambar Baru</span>
                       {:else if websiteSettings.heroImage}
-                        <img src={`http://localhost:9999/assets/${websiteSettings.heroImage}`} alt="Hero Saat Ini" class="w-full h-full object-cover" />
+                        <img src={`/assets/${websiteSettings.heroImage}`} alt="Hero Saat Ini" class="w-full h-full object-cover" />
                       {:else}
                         <img src="src/assets/bglogin.jpg" alt="Default Hero" class="w-full h-full object-cover" />
                         <span class="absolute top-3 left-3 bg-gray-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">Default Sistem</span>
@@ -802,7 +802,7 @@
                         <img src={aboutFilePreview} alt="Pratinjau Baru" class="w-full h-full object-cover" />
                         <span class="absolute top-3 left-3 bg-blue-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">Pratinjau Baru</span>
                       {:else if websiteSettings.aboutImage}
-                        <img src={`http://localhost:9999/assets/${websiteSettings.aboutImage}`} alt="About Us Saat Ini" class="w-full h-full object-cover" />
+                        <img src={`/assets/${websiteSettings.aboutImage}`} alt="About Us Saat Ini" class="w-full h-full object-cover" />
                       {:else}
                         <img src="src/assets/bglogin.jpg" alt="Default About Us" class="w-full h-full object-cover" />
                         <span class="absolute top-3 left-3 bg-gray-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">Default Sistem</span>
@@ -940,7 +940,7 @@
                           <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex flex-col group relative">
                             <!-- Image container -->
                             <div class="aspect-[4/3] bg-gray-50 border-b border-gray-100 overflow-hidden relative">
-                              <img src={`http://localhost:9999/assets/${item.image}`} alt={item.description || item.title || "Foto Galeri"} class="w-full h-full object-cover" />
+                              <img src={`/assets/${item.image}`} alt={item.description || item.title || "Foto Galeri"} class="w-full h-full object-cover" />
                               
                               <button 
                                 on:click={() => deleteGalleryItem(item.id)}

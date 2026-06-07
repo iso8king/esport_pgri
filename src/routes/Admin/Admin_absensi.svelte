@@ -676,7 +676,7 @@
             {#if selectedSiswaDetail.jawaban.bukti}
               <div class="flex items-center justify-center w-full bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
                 <img 
-                  src={`http://localhost:9999/assets/${selectedSiswaDetail.jawaban.bukti}`} 
+                  src={`/assets/${selectedSiswaDetail.jawaban.bukti}`} 
                   alt="Bukti Absen" 
                   class="max-w-full h-auto object-cover"
                 />
