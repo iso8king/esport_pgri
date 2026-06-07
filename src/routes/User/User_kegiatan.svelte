@@ -139,7 +139,7 @@
             createdAt: item.createdAt,
             deskripsi: item.deskripsi || null,
             mood: item.mood || null,
-            bukti_url: item.bukti ? `http://localhost:9999/assets/${item.bukti}` : null
+            bukti_url: item.bukti ? `/assets/${item.bukti}` : null
           });
         });
       }

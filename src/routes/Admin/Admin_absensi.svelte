@@ -174,6 +174,75 @@
     }
   }
 
+  // Fungsi export ke Excel
+  async function exportToExcel() {
+    if (!selectedJadwal) return;
+    
+    // Cek apakah ada yang sudah absen
+    if (selectedJadwal.totalHadir === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Tidak Ada Data',
+        text: 'Belum ada peserta yang melakukan absen, tidak ada data yang bisa diekspor.',
+        confirmButtonColor: '#0a4682'
+      });
+      return;
+    }
+    
+    try {
+      Swal.fire({
+        title: 'Mengekspor data...',
+        text: 'Mohon tunggu sebentar',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+      
+      const response = await fetch(`/api/absen/export?id_kegiatan=${selectedJadwal.id}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Gagal mengekspor data');
+      }
+      
+      // Ambil blob response
+      const blob = await response.blob();
+      
+      // Buat URL untuk download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `absen_${selectedJadwal.judul}_${selectedJadwal.tanggalFormatted}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil!',
+        text: 'Data absen berhasil diekspor ke Excel.',
+        timer: 1500,
+        showConfirmButton: false
+      });
+      
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal!',
+        text: 'Gagal mengekspor data. Silakan coba lagi.',
+        confirmButtonColor: '#0a4682'
+      });
+    }
+  }
+
   // Helper untuk konversi mood ke emoji
   function getMoodEmoji(mood) {
     const moodMap = {
@@ -609,7 +678,8 @@
                 </div>
                 <button 
                   on:click={exportToExcel}
-                  class="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white transition-colors bg-green-600 rounded-lg shadow-sm hover:bg-green-700 cursor-pointer"
+                  disabled={selectedJadwal.totalHadir === 0}
+                  class="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white transition-colors rounded-lg shadow-sm cursor-pointer {selectedJadwal.totalHadir === 0 ? 'bg-green-400 cursor-not-allowed opacity-50' : 'bg-green-600 hover:bg-green-700'}"
                 >
                   <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
