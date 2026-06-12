@@ -245,7 +245,10 @@
         credentials: 'include',
         body: JSON.stringify(bodyData)
       });
-      if (!response.ok) throw new Error("Gagal update data");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.errors || "Gagal update data");
+      }
       
       closeEditModal();
       Swal.fire({ icon: "success", title: "Berhasil!", text: `Anggota berhasil ditambahkan ke team ${formData.team} dengan role ${formData.position}`, timer: 1500, showConfirmButton: false });
