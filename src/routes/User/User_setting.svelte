@@ -39,6 +39,22 @@
   let countdown = 0;
   let countdownInterval = null;
   let isSendingOtp = false;
+  let otpTimestamp = null;
+
+  function saveOtpState() {
+    if (isOtpModalOpen) {
+      sessionStorage.setItem("otp_modal_state", JSON.stringify({
+        pendingProfileData,
+        pendingPasswordData,
+        otpAction,
+        otpCodes,
+        countdown,
+        otpTimestamp: otpTimestamp || Date.now()
+      }));
+    } else {
+      sessionStorage.removeItem("otp_modal_state");
+    }
+  }
 
   // Helper function untuk cek apakah user punya tim
   function hasTeam() {
@@ -101,14 +117,60 @@
       });
       return;
     }
+
+    // Restore OTP state if exists
+    const savedOtpStateStr = sessionStorage.getItem("otp_modal_state");
+    if (savedOtpStateStr) {
+      try {
+        const savedState = JSON.parse(savedOtpStateStr);
+        if (savedState) {
+          pendingProfileData = savedState.pendingProfileData;
+          pendingPasswordData = savedState.pendingPasswordData;
+          otpAction = savedState.otpAction;
+          otpCodes = savedState.otpCodes || ['', '', '', ''];
+          otpTimestamp = savedState.otpTimestamp;
+          
+          if (otpAction === 'profile' && pendingProfileData) {
+            profile.nama = pendingProfileData.nama;
+            profile.email = pendingProfileData.email;
+            profile.game_id = pendingProfileData.game_id;
+            profile.server_id = pendingProfileData.server_id;
+          } else if (otpAction === 'password' && pendingPasswordData) {
+            password.current = pendingPasswordData.current;
+            password.new = pendingPasswordData.new;
+            password.confirm = pendingPasswordData.new;
+          }
+          
+          const elapsedSeconds = Math.floor((Date.now() - otpTimestamp) / 1000);
+          const remainingCountdown = 60 - elapsedSeconds;
+          
+          isOtpModalOpen = true;
+          
+          if (remainingCountdown > 0) {
+            startCountdown(remainingCountdown);
+          } else {
+            countdown = 0;
+          }
+          
+          setTimeout(() => {
+            if (otpInputs[0]) otpInputs[0].focus();
+          }, 100);
+        }
+      } catch (e) {
+        console.error("Error restoring OTP state:", e);
+        sessionStorage.removeItem("otp_modal_state");
+      }
+    }
   });
   
   function startCountdown(seconds = 60) {
     countdown = seconds;
+    saveOtpState();
     if (countdownInterval) clearInterval(countdownInterval);
     countdownInterval = setInterval(() => {
       if (countdown > 0) {
         countdown--;
+        saveOtpState();
       } else {
         clearInterval(countdownInterval);
       }
@@ -126,7 +188,9 @@
       
       Swal.close();
       
+      otpTimestamp = Date.now();
       startCountdown(60);
+      saveOtpState();
       return true;
     } catch (error) {
       console.error("Error sending OTP:", error);
@@ -223,14 +287,13 @@
       });
   
       if (response.status === 200) {
-        push('/signIn');
         return true;
       } else {
         const data = await response.json();
         Swal.fire({
           icon: 'error',
           title: 'Gagal Update Password',
-          text: data.message || 'Password saat ini salah!',
+          text: data.errors || data.message || 'Password saat ini salah!',
           confirmButtonColor: '#ef4444'
         });
         return false;
@@ -246,9 +309,13 @@
     const value = event.target.value;
     if (!/^\d*$/.test(value)) {
       otpCodes[index] = '';
+      otpCodes = otpCodes;
+      saveOtpState();
       return;
     }
     otpCodes[index] = value.slice(-1);
+    otpCodes = otpCodes;
+    saveOtpState();
     if (otpCodes[index] && index < 3) {
       otpInputs[index + 1].focus();
     }
@@ -269,6 +336,8 @@
     if (event.key === 'ArrowRight' && index < 3) {
       otpInputs[index + 1].focus();
     }
+    otpCodes = otpCodes;
+    saveOtpState();
   }
 
   function handleOtpPaste(event) {
@@ -277,6 +346,8 @@
     for (let i = 0; i < 4; i++) {
       otpCodes[i] = pasted[i] || '';
     }
+    otpCodes = otpCodes;
+    saveOtpState();
     const lastIndex = Math.min(pasted.length, 3);
     otpInputs[lastIndex]?.focus();
   }
@@ -289,6 +360,8 @@
     otpAction = null;
     if (countdownInterval) clearInterval(countdownInterval);
     countdown = 0;
+    otpTimestamp = null;
+    sessionStorage.removeItem("otp_modal_state");
   }
   
   async function saveProfile() {
@@ -322,6 +395,7 @@
     if (otpSent) {
       otpCodes = ['', '', '', ''];
       isOtpModalOpen = true;
+      saveOtpState();
       
       setTimeout(() => {
         if (otpInputs[0]) otpInputs[0].focus();
@@ -344,6 +418,39 @@
       return;
     }
 
+    isSendingOtp = true;
+    try {
+      // Verifikasi password saat ini ke backend terlebih dahulu
+      const checkResponse = await fetch("/api/users/check-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: password.current }),
+        credentials: 'include'
+      });
+      
+      if (checkResponse.status !== 200) {
+        const checkData = await checkResponse.json();
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: checkData.errors || checkData.message || 'Password saat ini yang Anda masukkan salah!',
+          confirmButtonColor: '#ef4444'
+        });
+        isSendingOtp = false;
+        return;
+      }
+    } catch (err) {
+      console.error("Error checking password:", err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Gagal memverifikasi password. Silakan coba lagi.',
+        confirmButtonColor: '#ef4444'
+      });
+      isSendingOtp = false;
+      return;
+    }
+
     pendingPasswordData = {
       current: password.current,
       new: password.new
@@ -354,6 +461,7 @@
     if (otpSent) {
       otpCodes = ['', '', '', ''];
       isOtpModalOpen = true;
+      saveOtpState();
       
       setTimeout(() => {
         if (otpInputs[0]) otpInputs[0].focus();
@@ -401,15 +509,19 @@
       }
       
       if (updateSuccess) {
+        resetOtpModal();
+        localStorage.clear();
+        sessionStorage.clear();
+        
         Swal.fire({
           icon: "success", 
           title: otpAction === 'profile' ? "Profil berhasil diperbarui!" : "Password berhasil diubah!", 
+          text: "Data Anda telah diperbarui. Silakan login kembali dengan data baru Anda.",
           confirmButtonColor: "#0a4682",
-          timer: 1500,
-          showConfirmButton: false
+          confirmButtonText: "Login Kembali"
+        }).then(() => {
+          push('/signin');
         });
-        
-        resetOtpModal();
       } else {
         throw new Error(otpAction === 'profile' ? "Gagal update profil" : "Gagal update password");
       }
