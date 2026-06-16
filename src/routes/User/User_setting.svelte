@@ -81,7 +81,7 @@
       profile.email = localStorage.getItem("email") || "";
       profile.game_id = localStorage.getItem("user_game_id") || "";
       profile.server_id = localStorage.getItem("user_server_id") || "";
-      profile.team = getTeamName(); // Gunakan fungsi helper
+      profile.team = getTeamName();
       
       // Simpan data profil awal
       initialProfile = {
@@ -135,6 +135,7 @@
           
           if (otpAction === 'profile' && pendingProfileData) {
             profile.nama = pendingProfileData.nama;
+            profile.username = pendingProfileData.username;
             profile.email = pendingProfileData.email;
             profile.game_id = pendingProfileData.game_id;
             profile.server_id = pendingProfileData.server_id;
@@ -252,31 +253,96 @@
     }
   }
 
-  // Update profile ke server
+  // Update profile ke server - PERBAIKAN
   async function updateProfileToServer(updatedData) {
     try {
+      // Siapkan data yang akan dikirim (termasuk username jika berubah)
+      const dataToSend = {};
+      
+      // Cek dan tambahkan field yang berubah
+      if (profile.nama !== initialProfile.nama && updatedData.nama) {
+        dataToSend.nama = updatedData.nama;
+      }
+      if (profile.username !== initialProfile.username && updatedData.username) {
+        dataToSend.username = updatedData.username;
+      }
+      if (profile.email !== initialProfile.email && updatedData.email) {
+        dataToSend.email = updatedData.email;
+      }
+      if (profile.game_id !== initialProfile.game_id && updatedData.game_id) {
+        dataToSend.game_id = updatedData.game_id;
+      }
+      if (profile.server_id !== initialProfile.server_id && updatedData.server_id) {
+        dataToSend.server_id = updatedData.server_id;
+      }
+      
+      // Jika tidak ada perubahan, return true
+      if (Object.keys(dataToSend).length === 0) {
+        Swal.fire({
+          icon: "info",
+          title: "Tidak Ada Perubahan",
+          text: "Tidak ada data yang diubah untuk disimpan.",
+          confirmButtonColor: "#0a4682"
+        });
+        return true;
+      }
+      
       const response = await fetch("/api/users/updateprofile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedData),
+        body: JSON.stringify(dataToSend),
         credentials: 'include'
       });
-  
+
       if (response.status === 200) {
-        localStorage.setItem("user_name", updatedData.nama);
-        localStorage.setItem("email", updatedData.email);
-        localStorage.setItem("user_game_id", updatedData.game_id);
-        localStorage.setItem("user_server_id", updatedData.server_id);
+        // Update localStorage hanya untuk field yang berubah
+        if (dataToSend.nama) {
+          localStorage.setItem("user_name", dataToSend.nama);
+          initialProfile.nama = dataToSend.nama;
+        }
+        if (dataToSend.username) {
+          localStorage.setItem("username", dataToSend.username);
+          initialProfile.username = dataToSend.username;
+        }
+        if (dataToSend.email) {
+          localStorage.setItem("email", dataToSend.email);
+          initialProfile.email = dataToSend.email;
+        }
+        if (dataToSend.game_id) {
+          localStorage.setItem("user_game_id", dataToSend.game_id);
+          initialProfile.game_id = dataToSend.game_id;
+        }
+        if (dataToSend.server_id) {
+          localStorage.setItem("user_server_id", dataToSend.server_id);
+          initialProfile.server_id = dataToSend.server_id;
+        }
+        
         return true;
+      } else {
+        const data = await response.json();
+        // Tampilkan pesan error dari backend dengan struktur {errors: ''}
+        const errorMessage = data.errors || data.message || 'Gagal memperbarui profil';
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal Update Profil',
+          text: errorMessage,
+          confirmButtonColor: '#ef4444'
+        });
+        return false;
       }
-      return false;
     } catch (error) {
       console.error("Error updating profile:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
+        confirmButtonColor: '#ef4444'
+      });
       return false;
     }
   }
 
-  // Update password ke server
+  // Update password ke server - PERBAIKAN
   async function updatePasswordToServer(passwordData) {
     try {
       const response = await fetch("/api/users/update/password", {
@@ -288,21 +354,29 @@
         }),
         credentials: 'include'
       });
-  
+
       if (response.status === 200) {
         return true;
       } else {
         const data = await response.json();
+        // Tampilkan pesan error dari backend
+        const errorMessage = data.errors || data.message || 'Password saat ini salah!';
         Swal.fire({
           icon: 'error',
           title: 'Gagal Update Password',
-          text: data.errors || data.message || 'Password saat ini salah!',
+          text: errorMessage,
           confirmButtonColor: '#ef4444'
         });
         return false;
       }
     } catch (error) {
       console.error("Error updating password:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
+        confirmButtonColor: '#ef4444'
+      });
       return false;
     }
   }
@@ -367,27 +441,53 @@
     sessionStorage.removeItem("otp_modal_state");
   }
   
+  // PERBAIKAN: Fungsi saveProfile dengan validasi lengkap
   async function saveProfile() {
     if (isSendingOtp) return;
-    if (!profile.nama.trim()) {
+    
+    // Cek perubahan pada SEMUA field termasuk username
+    const hasNamaChange = profile.nama.trim() !== initialProfile.nama && profile.nama.trim() !== "";
+    const hasUsernameChange = profile.username.trim() !== initialProfile.username && profile.username.trim() !== "";
+    const hasEmailChange = profile.email.trim() !== initialProfile.email && profile.email.trim() !== "";
+    const hasGameIdChange = profile.game_id.trim() !== initialProfile.game_id && profile.game_id.trim() !== "";
+    const hasServerIdChange = profile.server_id.trim() !== initialProfile.server_id && profile.server_id.trim() !== "";
+    
+    // Jika tidak ada perubahan sama sekali
+    if (!hasNamaChange && !hasUsernameChange && !hasEmailChange && !hasGameIdChange && !hasServerIdChange) {
+      Swal.fire({
+        icon: "info",
+        title: "Tidak Ada Perubahan",
+        text: "Tidak ada data yang diubah untuk disimpan.",
+        confirmButtonColor: "#0a4682"
+      });
+      return;
+    }
+    
+    // Validasi field yang diubah
+    if (hasNamaChange && !profile.nama.trim()) {
       Swal.fire({ icon: "warning", title: "Nama tidak boleh kosong!", confirmButtonColor: "#0a4682" });
       return;
     }
-    if (!profile.email.trim()) {
+    if (hasUsernameChange && !profile.username.trim()) {
+      Swal.fire({ icon: "warning", title: "Username tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+    if (hasEmailChange && !profile.email.trim()) {
       Swal.fire({ icon: "warning", title: "Email tidak boleh kosong!", confirmButtonColor: "#0a4682" });
       return;
     }
-    if (!profile.game_id.trim()) {
+    if (hasGameIdChange && !profile.game_id.trim()) {
       Swal.fire({ icon: "warning", title: "Game ID tidak boleh kosong!", confirmButtonColor: "#0a4682" });
       return;
     }
-    if (!profile.server_id.trim()) {
+    if (hasServerIdChange && !profile.server_id.trim()) {
       Swal.fire({ icon: "warning", title: "Server ID tidak boleh kosong!", confirmButtonColor: "#0a4682" });
       return;
     }
 
     pendingProfileData = {
       nama: profile.nama,
+      username: profile.username, // INI PENTING: username dimasukkan
       email: profile.email,
       game_id: profile.game_id,
       server_id: profile.server_id
@@ -472,6 +572,7 @@
     }
   }
   
+  // PERBAIKAN: Fungsi handleVerifyOtp
   async function handleVerifyOtp() {
     const otpCode = otpCodes.join('');
     
@@ -493,6 +594,7 @@
       if (!isValid) {
         otpCodes = ['', '', '', ''];
         otpInputs[0]?.focus();
+        isLoadingOtp = false;
         return;
       }
 
@@ -501,8 +603,11 @@
       if (otpAction === 'profile') {
         updateSuccess = await updateProfileToServer(pendingProfileData);
         if (updateSuccess) {
-          currentUserName = pendingProfileData.nama;
-          initialProfile = { ...pendingProfileData };
+          // Update currentUserName jika nama berubah
+          if (pendingProfileData.nama) {
+            currentUserName = pendingProfileData.nama;
+          }
+          // initialProfile sudah diupdate di dalam fungsi updateProfileToServer
         }
       } else if (otpAction === 'password') {
         updateSuccess = await updatePasswordToServer(pendingPasswordData);
@@ -525,18 +630,12 @@
         }).then(() => {
           push('/signin');
         });
-      } else {
-        throw new Error(otpAction === 'profile' ? "Gagal update profil" : "Gagal update password");
       }
+      // Jika update gagal, error sudah ditangani di fungsi masing-masing
       
     } catch (error) {
       console.error("Error:", error);
-      Swal.fire({
-        icon: "error", 
-        title: "Gagal!", 
-        text: error.message || "Terjadi kesalahan saat memperbarui data", 
-        confirmButtonColor: "#ef4444" 
-      });
+      // Error sudah ditangani di fungsi masing-masing
     } finally {
       isLoadingOtp = false;
     }

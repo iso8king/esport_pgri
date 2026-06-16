@@ -3,13 +3,22 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
 
-
-
   let currentUserName = "Loading...";
   let activeTab = "profile";
 
-  let profile = { nama: "", username: "", email: "", phone: "", role: "Admin" };
+  let profile = { nama: "", username: "", email: "", role: "Admin", game_id: "", server_id: "" };
   let password = { current: "", new: "", confirm: "" };
+  
+  // State untuk menyimpan data awal profil
+  let initialProfile = { nama: "", username: "", email: "", game_id: "", server_id: "" };
+
+  // Reactive statement untuk mengecek apakah ada perubahan
+  $: isProfileUnchanged = 
+    profile.nama === initialProfile.nama &&
+    profile.username === initialProfile.username &&
+    profile.email === initialProfile.email &&
+    profile.game_id === initialProfile.game_id &&
+    profile.server_id === initialProfile.server_id;
 
   let websiteSettings = { heroImage: null, aboutText: "", aboutImage: null, gallery: [] };
   let selectedFile = null;
@@ -31,6 +40,34 @@
   let isDeletingGalleryId = null;
 
   let subTab = "hero"; // 'hero', 'about', 'gallery'
+
+  // State untuk modal OTP
+  let isOtpModalOpen = false;
+  let otpCodes = ['', '', '', ''];
+  let otpInputs = [];
+  let pendingProfileData = null;
+  let pendingPasswordData = null;
+  let otpAction = null;
+  let isLoadingOtp = false;
+  let countdown = 0;
+  let countdownInterval = null;
+  let isSendingOtp = false;
+  let otpTimestamp = null;
+
+  function saveOtpState() {
+    if (isOtpModalOpen) {
+      sessionStorage.setItem("otp_modal_state_admin", JSON.stringify({
+        pendingProfileData,
+        pendingPasswordData,
+        otpAction,
+        otpCodes,
+        countdown,
+        otpTimestamp: otpTimestamp || Date.now()
+      }));
+    } else {
+      sessionStorage.removeItem("otp_modal_state_admin");
+    }
+  }
 
   async function fetchWebsiteSettings() {
     try {
@@ -415,6 +452,484 @@
     });
   }
 
+  function startCountdown(seconds = 60) {
+    countdown = seconds;
+    saveOtpState();
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+      if (countdown > 0) {
+        countdown--;
+        saveOtpState();
+      } else {
+        clearInterval(countdownInterval);
+      }
+    }, 1000);
+  }
+
+  async function sendOtpEmail() {
+    isSendingOtp = true;
+    try {
+      const response = await fetch("/api/users/request/otp", {
+        method: "POST",
+        credentials: 'include'
+      });
+      const data = await response.json();
+      
+      Swal.close();
+      
+      otpTimestamp = Date.now();
+      startCountdown(60);
+      saveOtpState();
+      return true;
+    } catch (error) {
+      console.error("Error sending OTP:", error);
+      Swal.close();
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Kirim OTP',
+        text: 'Terjadi kesalahan, silakan coba lagi',
+        confirmButtonColor: '#ef4444'
+      });
+      return false;
+    } finally {
+      isSendingOtp = false;
+    }
+  }
+
+  // Verifikasi OTP
+  async function verifyOtp(otpCode) {
+    try {
+      const response = await fetch("/api/users/verify", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          otp: otpCode 
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.status !== 200) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Verifikasi Gagal',
+          text: data.message || 'Kode verifikasi yang kamu masukkan salah!',
+          confirmButtonColor: '#ef4444'
+        });
+        return false;  
+      } else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Verifikasi Berhasil!',
+          text: `Kode OTP valid!`,
+          confirmButtonColor: '#3b82f6',
+          timer: 1500,
+          showConfirmButton: false
+        });
+        return true; 
+      }
+      
+    } catch (error) {
+      console.error("Error verifying OTP:", error);
+      return false; 
+    }
+  }
+
+  // Update profile ke server
+  async function updateProfileToServer(updatedData) {
+    try {
+      // Siapkan data yang akan dikirim (termasuk username jika berubah)
+      const dataToSend = {};
+      
+      // Cek dan tambahkan field yang berubah
+      if (profile.nama !== initialProfile.nama && updatedData.nama) {
+        dataToSend.nama = updatedData.nama;
+      }
+      if (profile.username !== initialProfile.username && updatedData.username) {
+        dataToSend.username = updatedData.username;
+      }
+      if (profile.email !== initialProfile.email && updatedData.email) {
+        dataToSend.email = updatedData.email;
+      }
+      if (profile.game_id !== initialProfile.game_id && updatedData.game_id) {
+        dataToSend.game_id = updatedData.game_id;
+      }
+      if (profile.server_id !== initialProfile.server_id && updatedData.server_id) {
+        dataToSend.server_id = updatedData.server_id;
+      }
+      
+      // Jika tidak ada perubahan, return true
+      if (Object.keys(dataToSend).length === 0) {
+        return true;
+      }
+      
+      const response = await fetch("/api/users/updateprofile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dataToSend),
+        credentials: 'include'
+      });
+
+      if (response.status === 200) {
+        // Update localStorage hanya untuk field yang berubah
+        if (dataToSend.nama) {
+          localStorage.setItem("user_name", dataToSend.nama);
+          initialProfile.nama = dataToSend.nama;
+        }
+        if (dataToSend.username) {
+          localStorage.setItem("username", dataToSend.username);
+          initialProfile.username = dataToSend.username;
+        }
+        if (dataToSend.email) {
+          localStorage.setItem("email", dataToSend.email);
+          initialProfile.email = dataToSend.email;
+        }
+        if (dataToSend.game_id) {
+          localStorage.setItem("user_game_id", dataToSend.game_id);
+          initialProfile.game_id = dataToSend.game_id;
+        }
+        if (dataToSend.server_id) {
+          localStorage.setItem("user_server_id", dataToSend.server_id);
+          initialProfile.server_id = dataToSend.server_id;
+        }
+        
+        return true;
+      } else {
+        const data = await response.json();
+        // Tampilkan pesan error dari backend dengan struktur {errors: ''}
+        const errorMessage = data.errors || data.message || 'Gagal memperbarui profil';
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal Update Profil',
+          text: errorMessage,
+          confirmButtonColor: '#ef4444'
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
+        confirmButtonColor: '#ef4444'
+      });
+      return false;
+    }
+  }
+
+  // Update password ke server
+  async function updatePasswordToServer(passwordData) {
+    try {
+      const response = await fetch("/api/users/update/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: passwordData.current,
+          password_new: passwordData.new
+        }),
+        credentials: 'include'
+      });
+
+      if (response.status === 200) {
+        return true;
+      } else {
+        const data = await response.json();
+        // Tampilkan pesan error dari backend
+        const errorMessage = data.errors || data.message || 'Password saat ini salah!';
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal Update Password',
+          text: errorMessage,
+          confirmButtonColor: '#ef4444'
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error("Error updating password:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
+        confirmButtonColor: '#ef4444'
+      });
+      return false;
+    }
+  }
+
+  function handleOtpInput(index, event) {
+    const value = event.target.value;
+    if (!/^\d*$/.test(value)) {
+      otpCodes[index] = '';
+      otpCodes = otpCodes;
+      saveOtpState();
+      return;
+    }
+    otpCodes[index] = value.slice(-1);
+    otpCodes = otpCodes;
+    saveOtpState();
+    if (otpCodes[index] && index < 3) {
+      otpInputs[index + 1].focus();
+    }
+  }
+
+  function handleOtpKeydown(index, event) {
+    if (event.key === 'Backspace') {
+      if (!otpCodes[index] && index > 0) {
+        otpCodes[index - 1] = '';
+        otpInputs[index - 1].focus();
+      } else {
+        otpCodes[index] = '';
+      }
+    }
+    if (event.key === 'ArrowLeft' && index > 0) {
+      otpInputs[index - 1].focus();
+    }
+    if (event.key === 'ArrowRight' && index < 3) {
+      otpInputs[index + 1].focus();
+    }
+    otpCodes = otpCodes;
+    saveOtpState();
+  }
+
+  function handleOtpPaste(event) {
+    event.preventDefault();
+    const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+    for (let i = 0; i < 4; i++) {
+      otpCodes[i] = pasted[i] || '';
+    }
+    otpCodes = otpCodes;
+    saveOtpState();
+    const lastIndex = Math.min(pasted.length, 3);
+    otpInputs[lastIndex]?.focus();
+  }
+
+  function resetOtpModal() {
+    otpCodes = ['', '', '', ''];
+    isOtpModalOpen = false;
+    pendingProfileData = null;
+    pendingPasswordData = null;
+    otpAction = null;
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdown = 0;
+    otpTimestamp = null;
+    sessionStorage.removeItem("otp_modal_state_admin");
+  }
+
+  // Fungsi saveProfile dengan validasi lengkap dan OTP
+  async function saveProfile() {
+    if (isSendingOtp) return;
+    
+    // Cek perubahan pada SEMUA field
+    const hasNamaChange = profile.nama.trim() !== initialProfile.nama && profile.nama.trim() !== "";
+    const hasUsernameChange = profile.username.trim() !== initialProfile.username && profile.username.trim() !== "";
+    const hasEmailChange = profile.email.trim() !== initialProfile.email && profile.email.trim() !== "";
+    const hasGameIdChange = profile.game_id.trim() !== initialProfile.game_id && profile.game_id.trim() !== "";
+    const hasServerIdChange = profile.server_id.trim() !== initialProfile.server_id && profile.server_id.trim() !== "";
+    
+    // Jika tidak ada perubahan sama sekali
+    if (!hasNamaChange && !hasUsernameChange && !hasEmailChange && !hasGameIdChange && !hasServerIdChange) {
+      Swal.fire({
+        icon: "info",
+        title: "Tidak Ada Perubahan",
+        text: "Tidak ada data yang diubah untuk disimpan.",
+        confirmButtonColor: "#0a4682"
+      });
+      return;
+    }
+    
+    // Validasi field yang diubah
+    if (hasNamaChange && !profile.nama.trim()) {
+      Swal.fire({ icon: "warning", title: "Nama tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+    if (hasUsernameChange && !profile.username.trim()) {
+      Swal.fire({ icon: "warning", title: "Username tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+    if (hasEmailChange && !profile.email.trim()) {
+      Swal.fire({ icon: "warning", title: "Email tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+    if (hasGameIdChange && !profile.game_id.trim()) {
+      Swal.fire({ icon: "warning", title: "Game ID tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+    if (hasServerIdChange && !profile.server_id.trim()) {
+      Swal.fire({ icon: "warning", title: "Server ID tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+
+    pendingProfileData = {
+      nama: profile.nama,
+      username: profile.username,
+      email: profile.email,
+      game_id: profile.game_id,
+      server_id: profile.server_id
+    };
+    otpAction = 'profile';
+
+    const otpSent = await sendOtpEmail();
+    if (otpSent) {
+      otpCodes = ['', '', '', ''];
+      isOtpModalOpen = true;
+      saveOtpState();
+      
+      setTimeout(() => {
+        if (otpInputs[0]) otpInputs[0].focus();
+      }, 100);
+    }
+  }
+
+  // Fungsi savePassword dengan OTP
+  async function savePassword() {
+    if (isSendingOtp) return;
+    if (!password.current || !password.new || !password.confirm) {
+      Swal.fire({ icon: "warning", title: "Lengkapi semua field!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+    if (password.new !== password.confirm) {
+      Swal.fire({ icon: "error", title: "Password baru tidak cocok!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+    if (password.new.length < 6) {
+      Swal.fire({ icon: "error", title: "Password minimal 6 karakter!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+
+    isSendingOtp = true;
+    try {
+      // Verifikasi password saat ini ke backend terlebih dahulu
+      const checkResponse = await fetch("/api/users/check-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: password.current }),
+        credentials: 'include'
+      });
+      
+      if (checkResponse.status !== 200) {
+        const checkData = await checkResponse.json();
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: checkData.errors || checkData.message || 'Password saat ini yang Anda masukkan salah!',
+          confirmButtonColor: '#ef4444'
+        });
+        isSendingOtp = false;
+        return;
+      }
+    } catch (err) {
+      console.error("Error checking password:", err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Gagal memverifikasi password. Silakan coba lagi.',
+        confirmButtonColor: '#ef4444'
+      });
+      isSendingOtp = false;
+      return;
+    }
+
+    pendingPasswordData = {
+      current: password.current,
+      new: password.new
+    };
+    otpAction = 'password';
+
+    const otpSent = await sendOtpEmail();
+    if (otpSent) {
+      otpCodes = ['', '', '', ''];
+      isOtpModalOpen = true;
+      saveOtpState();
+      
+      setTimeout(() => {
+        if (otpInputs[0]) otpInputs[0].focus();
+      }, 100);
+    }
+  }
+
+  // Fungsi handleVerifyOtp
+  async function handleVerifyOtp() {
+    const otpCode = otpCodes.join('');
+    
+    if (otpCode.length !== 4) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Kode Tidak Lengkap',
+        text: 'Masukkan 4 digit kode verifikasi',
+        confirmButtonColor: '#0b5ba2'
+      });
+      return;
+    }
+
+    isLoadingOtp = true;
+
+    try {
+      const isValid = await verifyOtp(otpCode);
+      
+      if (!isValid) {
+        otpCodes = ['', '', '', ''];
+        otpInputs[0]?.focus();
+        isLoadingOtp = false;
+        return;
+      }
+
+      let updateSuccess = false;
+
+      if (otpAction === 'profile') {
+        updateSuccess = await updateProfileToServer(pendingProfileData);
+        if (updateSuccess) {
+          // Update currentUserName jika nama berubah
+          if (pendingProfileData.nama) {
+            currentUserName = pendingProfileData.nama;
+          }
+        }
+      } else if (otpAction === 'password') {
+        updateSuccess = await updatePasswordToServer(pendingPasswordData);
+        if (updateSuccess) {
+          password = { current: "", new: "", confirm: "" };
+        }
+      }
+      
+      if (updateSuccess) {
+        resetOtpModal();
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        Swal.fire({
+          icon: "success", 
+          title: otpAction === 'profile' ? "Profil berhasil diperbarui!" : "Password berhasil diubah!", 
+          text: "Data Anda telah diperbarui. Silakan login kembali dengan data baru Anda.",
+          confirmButtonColor: "#0a4682",
+          confirmButtonText: "Login Kembali"
+        }).then(() => {
+          push('/signin');
+        });
+      }
+      
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      isLoadingOtp = false;
+    }
+  }
+
+  function resendOtp() {
+    if (countdown > 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Tunggu Sebentar',
+        text: `Silakan tunggu ${countdown} detik sebelum meminta ulang OTP`,
+        confirmButtonColor: '#0b5ba2'
+      });
+      return;
+    }
+    sendOtpEmail();
+  }
+
   onMount(() => {
     const name = localStorage.getItem("user_name");
     const username = localStorage.getItem("username");
@@ -423,13 +938,23 @@
       profile.nama = name;
       profile.username = username || "";
       profile.email = localStorage.getItem("email") || (name.toLowerCase().replace(/\s/g, "") + "@esport.com");
-      profile.phone = "0812-3456-7890";
+      profile.game_id = localStorage.getItem("user_game_id") || "";
+      profile.server_id = localStorage.getItem("user_server_id") || "";
+      
+      // Simpan data profil awal
+      initialProfile = {
+        nama: profile.nama,
+        username: profile.username,
+        email: profile.email,
+        game_id: profile.game_id,
+        server_id: profile.server_id
+      };
     } else {
       push("/");
     }
 
-        if(localStorage.getItem("role") !== "admin"){
-    Swal.fire({
+    if(localStorage.getItem("role") !== "admin"){
+      Swal.fire({
         icon: 'error',
         title: 'Unauthorized',
         text: 'Redirecting......',
@@ -437,7 +962,7 @@
       }).then(() => {
         push('/user/absensi');
       });
-  }
+    }
 
     const userStatus = localStorage.getItem("status");
     if(!userStatus){
@@ -451,31 +976,54 @@
       });
       return;
     }
+    
     fetchWebsiteSettings();
+
+    // Restore OTP state if exists
+    const savedOtpStateStr = sessionStorage.getItem("otp_modal_state_admin");
+    if (savedOtpStateStr) {
+      try {
+        const savedState = JSON.parse(savedOtpStateStr);
+        if (savedState) {
+          pendingProfileData = savedState.pendingProfileData;
+          pendingPasswordData = savedState.pendingPasswordData;
+          otpAction = savedState.otpAction;
+          otpCodes = savedState.otpCodes || ['', '', '', ''];
+          otpTimestamp = savedState.otpTimestamp;
+          
+          if (otpAction === 'profile' && pendingProfileData) {
+            profile.nama = pendingProfileData.nama;
+            profile.username = pendingProfileData.username;
+            profile.email = pendingProfileData.email;
+            profile.game_id = pendingProfileData.game_id;
+            profile.server_id = pendingProfileData.server_id;
+          } else if (otpAction === 'password' && pendingPasswordData) {
+            password.current = pendingPasswordData.current;
+            password.new = pendingPasswordData.new;
+            password.confirm = pendingPasswordData.new;
+          }
+          
+          const elapsedSeconds = Math.floor((Date.now() - otpTimestamp) / 1000);
+          const remainingCountdown = 60 - elapsedSeconds;
+          
+          isOtpModalOpen = true;
+          
+          if (remainingCountdown > 0) {
+            startCountdown(remainingCountdown);
+          } else {
+            countdown = 0;
+          }
+          
+          setTimeout(() => {
+            if (otpInputs[0]) otpInputs[0].focus();
+          }, 100);
+        }
+      } catch (e) {
+        console.error("Error restoring OTP state:", e);
+        sessionStorage.removeItem("otp_modal_state_admin");
+      }
+    }
   });
-
-
-  function saveProfile() {
-    localStorage.setItem("user_name", profile.nama);
-    localStorage.setItem("username", profile.username);
-    currentUserName = profile.nama;
-    Swal.fire({ icon: "success", title: "Profil berhasil disimpan!", confirmButtonColor: "#0a4682" });
-  }
-
-  function savePassword() {
-    if (!password.current || !password.new || !password.confirm) {
-      Swal.fire({ icon: "warning", title: "Lengkapi semua field!", confirmButtonColor: "#0a4682" });
-      return;
-    }
-    if (password.new !== password.confirm) {
-      Swal.fire({ icon: "error", title: "Password baru tidak cocok!", confirmButtonColor: "#0a4682" });
-      return;
-    }
-    Swal.fire({ icon: "success", title: "Password berhasil diubah!", confirmButtonColor: "#0a4682" });
-    password = { current: "", new: "", confirm: "" };
-  }
-
-
 
   function handleLogout() {
     Swal.fire({
@@ -611,71 +1159,114 @@
           {/each}
         </div>
 
-        <!-- Tab Content -->
+        <!-- Tab Content: Profile - SAMA PERSIS DENGAN USER + Game ID & Server ID -->
         {#if activeTab === "profile"}
           <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
               <h3 class="text-lg font-bold text-gray-800">Informasi Profil</h3>
               <p class="text-sm text-gray-500">Perbarui informasi pribadi Anda</p>
             </div>
+            
             <div class="p-5 space-y-5 sm:p-6">
               <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
                   <label for="nama" class="block mb-1.5 text-sm font-semibold text-gray-700">Nama Lengkap</label>
-                  <input id="nama" type="text" bind:value={profile.nama} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <input id="nama" type="text" bind:value={profile.nama} 
+                    class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]" />
                 </div>
                 <div>
                   <label for="username" class="block mb-1.5 text-sm font-semibold text-gray-700">Username</label>
-                  <input id="username" type="text" bind:value={profile.username} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <input id="username" type="text" bind:value={profile.username} 
+                    class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]" />
                 </div>
                 <div>
                   <label for="role" class="block mb-1.5 text-sm font-semibold text-gray-700">Role</label>
-                  <input id="role" type="text" value={profile.role} disabled class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
+                  <input id="role" type="text" value={profile.role} disabled 
+                    class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
                 </div>
               </div>
+              
+              <div>
+                <label for="email" class="block mb-1.5 text-sm font-semibold text-gray-700">Email</label>
+                <input id="email" type="email" bind:value={profile.email} 
+                  class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]" />
+              </div>
+              
+              <!-- Tambahan Game ID & Server ID seperti di user -->
               <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
-                  <label for="email" class="block mb-1.5 text-sm font-semibold text-gray-700">Email</label>
-                  <input id="email" type="email" bind:value={profile.email} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <label for="game_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Game ID</label>
+                  <input id="game_id" type="text" bind:value={profile.game_id} 
+                    class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]" />
                 </div>
                 <div>
-                  <label for="phone" class="block mb-1.5 text-sm font-semibold text-gray-700">No. Telepon</label>
-                  <input id="phone" type="text" bind:value={profile.phone} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                  <label for="server_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Server ID</label>
+                  <input id="server_id" type="text" bind:value={profile.server_id} 
+                    class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]" />
                 </div>
               </div>
+              
               <div class="flex justify-end pt-2">
-                <button on:click={saveProfile} class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] active:scale-95">Simpan Profil</button>
+                <button on:click={saveProfile} 
+                  disabled={isSendingOtp || isProfileUnchanged}
+                  class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 bg-[#0a4682] hover:bg-[#0c5599]"
+                >
+                  {#if isSendingOtp}
+                    <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Menghubungkan...
+                  {:else}
+                    Simpan Profil
+                  {/if}
+                </button>
               </div>
             </div>
           </div>
 
+        <!-- Tab Content: Password - SAMA PERSIS DENGAN USER -->
         {:else if activeTab === "password"}
           <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
               <h3 class="text-lg font-bold text-gray-800">Ubah Password</h3>
               <p class="text-sm text-gray-500">Pastikan password Anda aman</p>
             </div>
+            
             <div class="p-5 space-y-5 sm:p-6">
               <div>
                 <label for="currentPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Password Saat Ini</label>
-                <input id="currentPw" type="password" bind:value={password.current} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Masukkan password saat ini" />
+                <input id="currentPw" type="password" bind:value={password.current} placeholder="Masukkan password saat ini"
+                  class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]" />
               </div>
+              
               <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
                   <label for="newPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Password Baru</label>
-                  <input id="newPw" type="password" bind:value={password.new} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Masukkan password baru" />
+                  <input id="newPw" type="password" bind:value={password.new} placeholder="Masukkan password baru"
+                    class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]" />
                 </div>
                 <div>
                   <label for="confirmPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Konfirmasi Password</label>
-                  <input id="confirmPw" type="password" bind:value={password.confirm} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Ulangi password baru" />
+                  <input id="confirmPw" type="password" bind:value={password.confirm} placeholder="Ulangi password baru"
+                    class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]" />
                 </div>
               </div>
+              
               <div class="flex justify-end pt-2">
-                <button on:click={savePassword} class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] active:scale-95">Ubah Password</button>
+                <button on:click={savePassword} 
+                  disabled={isSendingOtp}
+                  class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 bg-[#0a4682] hover:bg-[#0c5599]"
+                >
+                  {#if isSendingOtp}
+                    <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Menghubungkan...
+                  {:else}
+                    Ubah Password
+                  {/if}
+                </button>
               </div>
             </div>
           </div>
 
+        <!-- Tab Content: Website - TETAP SAMA -->
         {:else if activeTab === "website"}
           <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="px-5 py-4 border-b border-gray-100 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -712,7 +1303,6 @@
               {#if subTab === "hero"}
                 <!-- HERO SECTION -->
                 <div class="space-y-6">
-                  <!-- Current Image Preview -->
                   <div class="space-y-2">
                     <span class="block text-sm font-semibold text-gray-700">Gambar Hero Dashboard Saat Ini</span>
                     <div class="relative max-w-xl aspect-[4/3] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-inner flex items-center justify-center">
@@ -728,7 +1318,6 @@
                     </div>
                   </div>
 
-                  <!-- Upload Field -->
                   <div class="space-y-2">
                     <label class="block text-sm font-semibold text-gray-700">Unggah Gambar Hero Baru</label>
                     <div class="flex items-center justify-center w-full max-w-xl">
@@ -750,7 +1339,6 @@
                     </div>
                   </div>
 
-                  <!-- Action buttons -->
                   <div class="flex justify-between items-center pt-4 max-w-xl border-t border-gray-100">
                     {#if selectedFile}
                       <button 
@@ -780,7 +1368,6 @@
               {:else if subTab === "about"}
                 <!-- ABOUT US SECTION -->
                 <div class="space-y-6">
-                  <!-- Text Editor -->
                   <div class="space-y-2 max-w-xl">
                     <label for="aboutText" class="block text-sm font-semibold text-gray-700">Teks Deskripsi About Us</label>
                     <textarea 
@@ -801,7 +1388,6 @@
                     </div>
                   </div>
 
-                  <!-- Image Preview -->
                   <div class="space-y-2 pt-4 border-t border-gray-100 max-w-xl">
                     <span class="block text-sm font-semibold text-gray-700">Gambar About Us Saat Ini</span>
                     <div class="relative w-full aspect-video bg-gray-100 rounded-xl overflow-hidden border border-gray-200 shadow-inner flex items-center justify-center">
@@ -817,7 +1403,6 @@
                     </div>
                   </div>
 
-                  <!-- Upload Field -->
                   <div class="space-y-2 max-w-xl">
                     <label class="block text-sm font-semibold text-gray-700">Unggah Gambar About Us Baru</label>
                     <div class="flex items-center justify-center w-full">
@@ -839,7 +1424,6 @@
                     </div>
                   </div>
 
-                  <!-- Action buttons -->
                   <div class="flex justify-between items-center pt-4 max-w-xl border-t border-gray-100">
                     {#if selectedAboutFile}
                       <button 
@@ -869,7 +1453,6 @@
               {:else if subTab === "gallery"}
                 <!-- GALLERY SLIDER SECTION -->
                 <div class="space-y-8">
-                  <!-- Form Add New Item -->
                   <div class="p-5 border border-gray-200 rounded-xl bg-gray-50 space-y-4 max-w-xl">
                     <h4 class="text-sm font-bold text-gray-800">Tambah Foto Baru ke Galeri</h4>
                     
@@ -937,7 +1520,6 @@
                     </div>
                   </div>
 
-                  <!-- Gallery List / Grid -->
                   <div class="space-y-4">
                     <h4 class="text-sm font-bold text-gray-800">Daftar Foto Galeri Saat Ini</h4>
                     
@@ -945,7 +1527,6 @@
                       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                         {#each websiteSettings.gallery as item}
                           <div class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex flex-col group relative">
-                            <!-- Image container -->
                             <div class="aspect-[4/3] bg-gray-50 border-b border-gray-100 overflow-hidden relative">
                               <img src={`/assets/${item.image}`} alt={item.description || item.title || "Foto Galeri"} class="w-full h-full object-cover" />
                               
@@ -960,7 +1541,6 @@
                                 </svg>
                               </button>
                             </div>
-                            <!-- Title info -->
                             <div class="p-3.5 flex justify-between items-center bg-gray-50 border-t border-gray-100">
                               <div class="flex flex-col min-w-0 pr-4">
                                 <span class="text-xs font-bold text-gray-800 truncate">{item.title || "Foto Kegiatan"}</span>
@@ -1003,3 +1583,110 @@
     </main>
   </div>
 </div>
+
+<!-- MODAL OTP VERIFIKASI -->
+{#if isOtpModalOpen}
+<div class="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
+  <div class="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-sm" on:click={resetOtpModal} aria-hidden="true"></div>
+  
+  <div class="relative flex flex-col w-full max-w-md bg-white shadow-2xl rounded-2xl overflow-hidden">
+    
+    <div class="flex items-start justify-between p-6 border-b border-gray-100">
+      <div>
+        <h2 class="text-xl font-black text-gray-800">Verifikasi Kode OTP</h2>
+        <p class="text-sm text-gray-500 mt-1">Kode verifikasi telah dikirim ke</p>
+        <p class="text-sm font-semibold text-[#0a4682]">{profile.email}</p>
+      </div>
+      <button on:click={resetOtpModal} class="flex items-center justify-center w-8 h-8 text-white transition-colors bg-[#0a2e52] hover:bg-red-600 rounded-md shadow-sm">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+
+    <div class="p-6 space-y-6">
+      <!-- OTP Input -->
+      <div class="flex justify-center gap-3">
+        {#each otpCodes as code, i}
+          <input
+            bind:this={otpInputs[i]}
+            type="text"
+            inputmode="numeric"
+            maxlength="1"
+            value={code}
+            on:input={(e) => handleOtpInput(i, e)}
+            on:keydown={(e) => handleOtpKeydown(i, e)}
+            on:paste={handleOtpPaste}
+            disabled={isLoadingOtp}
+            class="w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl
+                   focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682] outline-none transition-all
+                   bg-white text-gray-800 shadow-sm disabled:opacity-50"
+            autocomplete="off"
+          />
+        {/each}
+      </div>
+
+      <!-- Resend OTP -->
+      <div class="text-center">
+        <p class="text-sm text-gray-500">
+          Tidak menerima kode?
+          <button 
+            on:click={resendOtp} 
+            disabled={countdown > 0}
+            class="font-semibold text-[#0a4682] hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {#if countdown > 0}
+              Kirim ulang ({countdown}s)
+            {:else}
+              Kirim ulang kode
+            {/if}
+          </button>
+        </p>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-3 pt-4">
+        <button 
+          on:click={resetOtpModal} 
+          class="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-colors border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          Batal
+        </button>
+        <button 
+          on:click={handleVerifyOtp} 
+          disabled={isLoadingOtp}
+          class="flex-1 px-4 py-2.5 text-sm font-bold text-white transition-colors bg-[#0a4682] rounded-lg hover:bg-[#0c5599] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {#if isLoadingOtp}
+            <svg class="animate-spin h-5 w-5 mx-auto" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+            </svg>
+          {:else}
+            Verifikasi & Simpan
+          {/if}
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+{/if}
+
+<style>
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+</style>
