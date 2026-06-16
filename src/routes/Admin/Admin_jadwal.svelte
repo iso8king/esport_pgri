@@ -17,6 +17,8 @@
 
   // Modal state
   let isModalOpen = false;
+  let isEditing = false;
+  let editId = null;
   let formData = {
     namaAcara: '',
     tanggalAcara: '',
@@ -27,6 +29,8 @@
   function openModal() { isModalOpen = true; }
   function closeModal() {
     isModalOpen = false;
+    isEditing = false;
+    editId = null;
     formData = {
       namaAcara: '',
       tanggalAcara: '',
@@ -35,7 +39,6 @@
     };
   }
 
-  // Fungsi untuk mengambil data jadwal dari backend
   // Fungsi untuk mengambil data jadwal dari backend
 async function fetchJadwalData() {
   isLoading = true;
@@ -64,7 +67,8 @@ async function fetchJadwalData() {
         teamOnly: item.onlyTeam ? "Ya" : "Tidak",
         status: getStatus(item.tanggal_kegiatan),
         tipe: item.onlyTeam ? "Team Only" : "Public",
-        team: "-"
+        team: "-",
+        tanggalOriginal: item.tanggal_kegiatan
       }));
       
       console.log('JadwalList setelah transformasi:', jadwalList);
@@ -80,7 +84,6 @@ async function fetchJadwalData() {
   }
 }
 
-// Fungsi helper untuk format tanggal (contoh: 1 Januari 2025)
 function formatDate(dateString) {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -144,8 +147,11 @@ function formatDate(dateString) {
         }
       });
 
-      const response = await fetch(`/api/kegiatan/create`, {
-        method: 'POST',
+      const url = isEditing ? `/api/kegiatan/${editId}/update` : `/api/kegiatan/create`;
+      const method = isEditing ? 'PATCH' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
         headers: {
           'Content-Type': 'application/json'
         },
@@ -158,7 +164,7 @@ function formatDate(dateString) {
       if (response.status !== 200) {
         Swal.fire({ 
           icon: "error", 
-          title: "Gagal Membuat Kegiatan!", 
+          title: isEditing ? "Gagal Mengubah Kegiatan!" : "Gagal Membuat Kegiatan!", 
           text: result.message || result.body || "Data tidak tersimpan di server.",
           confirmButtonColor: "#0a4682" 
         });
@@ -167,7 +173,7 @@ function formatDate(dateString) {
 
       Swal.fire({ 
         icon: "success", 
-        title: "Jadwal berhasil dibuat!", 
+        title: isEditing ? "Jadwal berhasil diubah!" : "Jadwal berhasil dibuat!", 
         text: result.message || "Data telah tersimpan di server.",
         confirmButtonColor: "#0a4682" 
       });
@@ -181,11 +187,104 @@ function formatDate(dateString) {
       console.error('Error:', error);
       Swal.fire({ 
         icon: "error", 
-        title: "Gagal menyimpan jadwal!", 
+        title: isEditing ? "Gagal mengubah jadwal!" : "Gagal menyimpan jadwal!", 
         text: error.message || "Terjadi kesalahan saat menghubungi server.",
         confirmButtonColor: "#0a4682" 
       });
     }
+  }
+
+  function openEditModal(jadwal) {
+    isEditing = true;
+    editId = jadwal.id;
+    
+    let formattedDate = "";
+    if (jadwal.tanggalOriginal) {
+      const date = new Date(jadwal.tanggalOriginal);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      formattedDate = `${year}-${month}-${day}`;
+    }
+
+    formData = {
+      namaAcara: jadwal.event,
+      tanggalAcara: formattedDate,
+      lokasi: jadwal.lokasi,
+      hanyaUntukTim: jadwal.teamOnly === "Ya"
+    };
+    isModalOpen = true;
+  }
+
+  async function deleteJadwal(id) {
+    // Cari jadwal berdasarkan id untuk mengecek statusnya
+    const jadwal = jadwalList.find(j => j.id === id);
+    if (!jadwal) return;
+
+    if (jadwal.status !== "Selesai") {
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Menghapus',
+        text: 'Hanya jadwal dengan status "Selesai" saja yang bisa dihapus!',
+        confirmButtonColor: '#0a4682'
+      });
+      return;
+    }
+
+    Swal.fire({
+      title: 'Apakah Anda yakin?',
+      text: 'Jadwal yang dihapus tidak dapat dikembalikan!',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#9ca3af',
+      confirmButtonText: 'Ya, hapus!',
+      cancelButtonText: 'Batal'
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          Swal.fire({
+            title: "Menghapus jadwal...",
+            allowOutsideClick: false,
+            didOpen: () => {
+              Swal.showLoading();
+            }
+          });
+
+          const response = await fetch(`/api/kegiatan/${id}/delete`, {
+            method: 'DELETE',
+            credentials: 'include'
+          });
+
+          const resData = await response.json();
+
+          if (response.ok) {
+            Swal.fire({
+              icon: 'success',
+              title: 'Dihapus!',
+              text: 'Jadwal berhasil dihapus.',
+              confirmButtonColor: '#0a4682'
+            });
+            await fetchJadwalData();
+          } else {
+            Swal.fire({
+              icon: 'error',
+              title: 'Gagal!',
+              text: resData.message || 'Gagal menghapus jadwal.',
+              confirmButtonColor: '#0a4682'
+            });
+          }
+        } catch (error) {
+          console.error(error);
+          Swal.fire({
+            icon: 'error',
+            title: 'Error!',
+            text: 'Terjadi kesalahan saat menghubungi server.',
+            confirmButtonColor: '#0a4682'
+          });
+        }
+      }
+    });
   }
 
   let currentUserName = "Loading...";
@@ -510,6 +609,7 @@ function formatDate(dateString) {
                     <th class="px-6 py-4 font-semibold">Jam</th>
                     <th class="px-6 py-4 font-semibold">Team Only</th>
                     <th class="px-6 py-4 font-semibold">Status</th>
+                    <th class="px-6 py-4 font-semibold text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody class="text-sm text-gray-700">
@@ -528,25 +628,84 @@ function formatDate(dateString) {
                           {jadwal.status}
                         </span>
                       </td>
+                      <td class="px-6 py-4 text-center whitespace-nowrap">
+                        <div class="flex items-center justify-center gap-2">
+                          <button on:click={() => openEditModal(jadwal)} class="p-2 text-blue-600 transition-colors rounded-md hover:bg-blue-50" title="Edit Data">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button on:click={() => deleteJadwal(jadwal.id)} class="p-2 text-red-600 transition-colors rounded-md hover:bg-red-50" title="Hapus Jadwal">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   {/each}
-                </tbody>
+                </tbody>        
               </table>
             </div>
 
-            <div class="block space-y-3 sm:hidden p-4">
+            <div class="block space-y-4 sm:hidden p-4">
               {#each jadwalList as jadwal}
-                <div class="p-4 border border-gray-100 rounded-xl bg-gray-50/50">
-                  <div class="flex items-start justify-between mb-2">
-                    <h4 class="text-sm font-bold text-gray-900">{jadwal.event}</h4>
-                    <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-full {jadwal.status === 'Selesai' ? 'bg-gray-200 text-gray-600' : jadwal.status === 'Hari Ini' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}">
-                      {jadwal.status}
-                    </span>
-                  </div>
-                  <div class="space-y-1 text-xs text-gray-600">
-                    <p><span class="font-semibold">Waktu:</span> {jadwal.waktu}</p>
-                    <p><span class="font-semibold">Jam:</span> {jadwal.lokasi}</p>
-                    <p><span class="font-semibold">Team Only:</span> {jadwal.teamOnly}</p>
+                <div class="p-5 border border-gray-150 rounded-2xl bg-white shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                  <!-- Decorative border-l for status colors -->
+                  <div class="absolute left-0 top-0 bottom-0 w-1.5 {jadwal.status === 'Selesai' ? 'bg-gray-400' : jadwal.status === 'Hari Ini' ? 'bg-green-500' : 'bg-blue-500'}"></div>
+                  
+                  <div class="pl-2">
+                    <div class="flex items-start justify-between mb-3 gap-2">
+                      <h4 class="text-base font-extrabold text-gray-900 leading-snug">{jadwal.event}</h4>
+                      <span class="inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-full shrink-0 {jadwal.status === 'Selesai' ? 'bg-gray-100 text-gray-600' : jadwal.status === 'Hari Ini' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}">
+                        {jadwal.status}
+                      </span>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3 py-3 border-t border-b border-gray-100 my-3 text-xs text-gray-600">
+                      <div class="space-y-1">
+                        <span class="text-gray-400 font-medium block">Waktu</span>
+                        <div class="flex items-center gap-1.5 font-semibold text-gray-800">
+                          <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span>{jadwal.waktu}</span>
+                        </div>
+                      </div>
+                      <div class="space-y-1">
+                        <span class="text-gray-400 font-medium block">Jam</span>
+                        <div class="flex items-center gap-1.5 font-semibold text-gray-800">
+                          <svg class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>{jadwal.lokasi}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between mt-3">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-400 font-medium">Akses:</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-full {jadwal.teamOnly === 'Ya' ? 'bg-blue-50 text-blue-600 border border-blue-150' : 'bg-gray-50 text-gray-600 border border-gray-150'}">
+                          {jadwal.teamOnly === 'Ya' ? 'Team Only' : 'Public'}
+                        </span>
+                      </div>
+                      
+                      <div class="flex items-center gap-2">
+                        <button on:click={() => openEditModal(jadwal)} class="inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded-lg transition-colors hover:bg-blue-100 animate-click" title="Edit Data">
+                          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <span>Edit</span>
+                        </button>
+                        <button on:click={() => deleteJadwal(jadwal.id)} class="inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-lg transition-colors hover:bg-red-100 animate-click" title="Hapus Jadwal">
+                          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          <span>Hapus</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               {/each}
@@ -569,7 +728,7 @@ function formatDate(dateString) {
       <div class="relative flex flex-col w-full max-w-lg shadow-2xl bg-[#f8fafc] rounded-xl max-h-[90vh]">
         
         <div class="flex items-center justify-between p-5 bg-white border-b border-gray-100 sm:p-6 rounded-t-xl">
-          <h2 class="text-lg font-extrabold text-gray-800 sm:text-xl">Buat Jadwal</h2>
+          <h2 class="text-lg font-extrabold text-gray-800 sm:text-xl">{isEditing ? 'Edit Jadwal' : 'Buat Jadwal'}</h2>
           <button
             on:click={closeModal}
             class="flex items-center justify-center w-8 h-8 text-white transition-colors shadow-sm bg-[#0a2e52] hover:bg-red-600 rounded-md"
