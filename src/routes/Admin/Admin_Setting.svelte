@@ -8,7 +8,7 @@
   let currentUserName = "Loading...";
   let activeTab = "profile";
 
-  let profile = { nama: "", email: "", phone: "", role: "Admin" };
+  let profile = { nama: "", username: "", email: "", phone: "", role: "Admin" };
   let password = { current: "", new: "", confirm: "" };
 
   let websiteSettings = { heroImage: null, aboutText: "", aboutImage: null, gallery: [] };
@@ -417,10 +417,12 @@
 
   onMount(() => {
     const name = localStorage.getItem("user_name");
+    const username = localStorage.getItem("username");
     if (name) {
       currentUserName = name;
       profile.nama = name;
-      profile.email = name.toLowerCase().replace(/\s/g, "") + "@esport.com";
+      profile.username = username || "";
+      profile.email = localStorage.getItem("email") || (name.toLowerCase().replace(/\s/g, "") + "@esport.com");
       profile.phone = "0812-3456-7890";
     } else {
       push("/");
@@ -455,6 +457,7 @@
 
   function saveProfile() {
     localStorage.setItem("user_name", profile.nama);
+    localStorage.setItem("username", profile.username);
     currentUserName = profile.nama;
     Swal.fire({ icon: "success", title: "Profil berhasil disimpan!", confirmButtonColor: "#0a4682" });
   }
@@ -620,6 +623,10 @@
                 <div>
                   <label for="nama" class="block mb-1.5 text-sm font-semibold text-gray-700">Nama Lengkap</label>
                   <input id="nama" type="text" bind:value={profile.nama} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+                </div>
+                <div>
+                  <label for="username" class="block mb-1.5 text-sm font-semibold text-gray-700">Username</label>
+                  <input id="username" type="text" bind:value={profile.username} class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
                 </div>
                 <div>
                   <label for="role" class="block mb-1.5 text-sm font-semibold text-gray-700">Role</label>

@@ -17,13 +17,14 @@
   let currentUserName = "Loading...";
   let activeTab = "profile";
 
-  let profile = { nama: "", email: "", role: "User", team: "", game_id: "", server_id: "" };
+  let profile = { nama: "", email: "", username: "",role: "User", team: "", game_id: "", server_id: "" };
   let password = { current: "", new: "", confirm: "" };
   
-  let initialProfile = { nama: "", email: "", game_id: "", server_id: "" };
+  let initialProfile = { nama: "", email: "", username: "", game_id: "", server_id: "" };
 
   $: isProfileUnchanged = 
     profile.nama === initialProfile.nama &&
+    profile.username === initialProfile.username &&
     profile.email === initialProfile.email &&
     profile.game_id === initialProfile.game_id &&
     profile.server_id === initialProfile.server_id;
@@ -76,6 +77,7 @@
     if (name) {
       currentUserName = name;
       profile.nama = name;
+      profile.username = localStorage.getItem("username") || "";
       profile.email = localStorage.getItem("email") || "";
       profile.game_id = localStorage.getItem("user_game_id") || "";
       profile.server_id = localStorage.getItem("user_server_id") || "";
@@ -84,6 +86,7 @@
       // Simpan data profil awal
       initialProfile = {
         nama: profile.nama,
+        username: profile.username,
         email: profile.email,
         game_id: profile.game_id,
         server_id: profile.server_id
@@ -713,6 +716,11 @@
             <div>
               <label for="nama" class="block mb-1.5 text-sm font-semibold text-gray-700">Nama Lengkap</label>
               <input id="nama" type="text" bind:value={profile.nama} 
+                class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
+            </div>
+            <div>
+              <label for="username" class="block mb-1.5 text-sm font-semibold text-gray-700">Username</label>
+              <input id="username" type="text" bind:value={profile.username} 
                 class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
             </div>
             <div>
