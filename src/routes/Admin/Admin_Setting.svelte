@@ -1368,25 +1368,6 @@
               {:else if subTab === "about"}
                 <!-- ABOUT US SECTION -->
                 <div class="space-y-6">
-                  <div class="space-y-2 max-w-xl">
-                    <label for="aboutText" class="block text-sm font-semibold text-gray-700">Teks Deskripsi About Us</label>
-                    <textarea 
-                      id="aboutText" 
-                      bind:value={aboutTextValue} 
-                      rows="4" 
-                      class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-y"
-                      placeholder="Masukkan deskripsi mengenai organisasi/website ini..."
-                    ></textarea>
-                    <div class="flex justify-end pt-1">
-                      <button 
-                        on:click={saveAboutText} 
-                        disabled={isSavingAboutText}
-                        class="px-5 py-2 text-xs font-bold text-white transition-all bg-[#0a4682] rounded-lg hover:bg-[#0c5599] disabled:opacity-50 cursor-pointer"
-                      >
-                        Simpan Perubahan Teks
-                      </button>
-                    </div>
-                  </div>
 
                   <div class="space-y-2 pt-4 border-t border-gray-100 max-w-xl">
                     <span class="block text-sm font-semibold text-gray-700">Gambar About Us Saat Ini</span>

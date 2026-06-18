@@ -123,11 +123,6 @@
           </h2>
           <div class="h-1.5 w-30 bg-[#1a5c8c] rounded-full mt-4 mx-auto md:mx-0"></div>
         </div>
-        
-        <p class="text-gray-600 text-sm sm:text-base leading-relaxed max-w-xl mx-auto md:mx-0 font-normal">
-          {settings.aboutText || defaultAboutText}
-        </p>
-
        <!-- // feature grid -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-10 text-left">
           <div class="p-5 rounded-2xl bg-[#f8fafc] border border-slate-100 hover:border-blue-200 transition-all duration-300 hover:shadow-lg hover:shadow-blue-900/5 group">

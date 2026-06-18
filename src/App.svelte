@@ -16,6 +16,7 @@
     import User_kegiatan from './routes/User/User_kegiatan.svelte';
     import User_setting from './routes/User/User_setting.svelte';
     import User_analisis from './routes/User/User_analisis.svelte';
+    import ForgetPassword from './routes/ForgetPassword.svelte';
 
 
     const routes = {
@@ -23,6 +24,7 @@
 
         '/signin': SignIn,
         '/signup': SignUp,
+        '/forgetpassword': ForgetPassword,
         '/verification': Verification,
 
         '/admin/beranda': Admin,

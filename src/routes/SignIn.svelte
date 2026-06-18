@@ -112,7 +112,6 @@
               required
               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-colors pr-10"
             />
-            
             <button
               type="button"
               class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
@@ -125,9 +124,13 @@
               {/if}
             </button>
           </div>
+          <div class="text-right mt-1">
+            <a href="#/forgetpassword" class="text-blue-500 font-semibold hover:underline">
+              Lupa Password ?
+            </a>
+          </div>
         </div>
-
-        <div class="pt-4 flex flex-col gap-4">
+        <div class="pt-1 flex flex-col gap-4">
           <button type="submit" class="w-full bg-[#0b5ba2] hover:bg-[#0b4c8d] text-white font-bold py-3 rounded-2xl transition-colors tracking-wider">
             SIGN IN
           </button>

@@ -253,26 +253,26 @@
     }
   }
 
-  // Update profile ke server - PERBAIKAN
+  // Update profile ke server - FIXED
   async function updateProfileToServer(updatedData) {
     try {
-      // Siapkan data yang akan dikirim (termasuk username jika berubah)
+      // Siapkan data yang akan dikirim
       const dataToSend = {};
       
-      // Cek dan tambahkan field yang berubah
-      if (profile.nama !== initialProfile.nama && updatedData.nama) {
+      // Cek perubahan menggunakan updatedData yang dikirim
+      if (updatedData.nama && updatedData.nama !== initialProfile.nama) {
         dataToSend.nama = updatedData.nama;
       }
-      if (profile.username !== initialProfile.username && updatedData.username) {
+      if (updatedData.username && updatedData.username !== initialProfile.username) {
         dataToSend.username = updatedData.username;
       }
-      if (profile.email !== initialProfile.email && updatedData.email) {
+      if (updatedData.email && updatedData.email !== initialProfile.email) {
         dataToSend.email = updatedData.email;
       }
-      if (profile.game_id !== initialProfile.game_id && updatedData.game_id) {
+      if (updatedData.game_id && updatedData.game_id !== initialProfile.game_id) {
         dataToSend.game_id = updatedData.game_id;
       }
-      if (profile.server_id !== initialProfile.server_id && updatedData.server_id) {
+      if (updatedData.server_id && updatedData.server_id !== initialProfile.server_id) {
         dataToSend.server_id = updatedData.server_id;
       }
       
@@ -295,32 +295,37 @@
       });
 
       if (response.status === 200) {
-        // Update localStorage hanya untuk field yang berubah
+        // Update localStorage dan initialProfile untuk semua field yang berubah
         if (dataToSend.nama) {
           localStorage.setItem("user_name", dataToSend.nama);
           initialProfile.nama = dataToSend.nama;
+          currentUserName = dataToSend.nama;
+          profile.nama = dataToSend.nama;
         }
         if (dataToSend.username) {
           localStorage.setItem("username", dataToSend.username);
           initialProfile.username = dataToSend.username;
+          profile.username = dataToSend.username;
         }
         if (dataToSend.email) {
           localStorage.setItem("email", dataToSend.email);
           initialProfile.email = dataToSend.email;
+          profile.email = dataToSend.email;
         }
         if (dataToSend.game_id) {
           localStorage.setItem("user_game_id", dataToSend.game_id);
           initialProfile.game_id = dataToSend.game_id;
+          profile.game_id = dataToSend.game_id;
         }
         if (dataToSend.server_id) {
           localStorage.setItem("user_server_id", dataToSend.server_id);
           initialProfile.server_id = dataToSend.server_id;
+          profile.server_id = dataToSend.server_id;
         }
         
         return true;
       } else {
         const data = await response.json();
-        // Tampilkan pesan error dari backend dengan struktur {errors: ''}
         const errorMessage = data.errors || data.message || 'Gagal memperbarui profil';
         Swal.fire({
           icon: 'error',
@@ -342,7 +347,7 @@
     }
   }
 
-  // Update password ke server - PERBAIKAN
+  // Update password ke server
   async function updatePasswordToServer(passwordData) {
     try {
       const response = await fetch("/api/users/update/password", {
@@ -359,7 +364,6 @@
         return true;
       } else {
         const data = await response.json();
-        // Tampilkan pesan error dari backend
         const errorMessage = data.errors || data.message || 'Password saat ini salah!';
         Swal.fire({
           icon: 'error',
@@ -441,11 +445,10 @@
     sessionStorage.removeItem("otp_modal_state");
   }
   
-  // PERBAIKAN: Fungsi saveProfile dengan validasi lengkap
   async function saveProfile() {
     if (isSendingOtp) return;
     
-    // Cek perubahan pada SEMUA field termasuk username
+    // Cek perubahan pada SEMUA field
     const hasNamaChange = profile.nama.trim() !== initialProfile.nama && profile.nama.trim() !== "";
     const hasUsernameChange = profile.username.trim() !== initialProfile.username && profile.username.trim() !== "";
     const hasEmailChange = profile.email.trim() !== initialProfile.email && profile.email.trim() !== "";
@@ -487,7 +490,7 @@
 
     pendingProfileData = {
       nama: profile.nama,
-      username: profile.username, // INI PENTING: username dimasukkan
+      username: profile.username,
       email: profile.email,
       game_id: profile.game_id,
       server_id: profile.server_id
@@ -523,7 +526,6 @@
 
     isSendingOtp = true;
     try {
-      // Verifikasi password saat ini ke backend terlebih dahulu
       const checkResponse = await fetch("/api/users/check-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -572,7 +574,6 @@
     }
   }
   
-  // PERBAIKAN: Fungsi handleVerifyOtp
   async function handleVerifyOtp() {
     const otpCode = otpCodes.join('');
     
@@ -603,11 +604,9 @@
       if (otpAction === 'profile') {
         updateSuccess = await updateProfileToServer(pendingProfileData);
         if (updateSuccess) {
-          // Update currentUserName jika nama berubah
           if (pendingProfileData.nama) {
             currentUserName = pendingProfileData.nama;
           }
-          // initialProfile sudah diupdate di dalam fungsi updateProfileToServer
         }
       } else if (otpAction === 'password') {
         updateSuccess = await updatePasswordToServer(pendingPasswordData);
@@ -631,11 +630,9 @@
           push('/signin');
         });
       }
-      // Jika update gagal, error sudah ditangani di fungsi masing-masing
       
     } catch (error) {
       console.error("Error:", error);
-      // Error sudah ditangani di fungsi masing-masing
     } finally {
       isLoadingOtp = false;
     }
@@ -680,6 +677,7 @@
   ];
 </script>
 
+<!-- HTML SAMA PERSIS SEPERTI KODE ANDA, TIDAK ADA PERUBAHAN -->
 <svelte:window bind:innerWidth />
 
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">
@@ -758,7 +756,7 @@
       <p class="mt-1 text-sm text-gray-500">Kelola akun dan preferensi Anda</p>
     </div>
 
-    <!-- Profile Card Top - Warna berubah berdasarkan status tim -->
+    <!-- Profile Card Top -->
     <div class="relative p-6 overflow-hidden text-white shadow-lg sm:p-8 bg-gradient-to-r 
       {hasTeam() ? 'from-[#0a4682] to-[#126bc2]' : 'from-red-700 to-rose-600'} 
       rounded-2xl"
