@@ -18,12 +18,11 @@
   let showConfirmPassword = false;
 
   let isSubmitting = false;
-  let generatedOtp = '';
   let countdown = 0;
   let countdownTimer;
 
   function startCountdown() {
-    countdown = 30;
+    countdown = 60;
     if (countdownTimer) clearInterval(countdownTimer);
     countdownTimer = setInterval(() => {
       if (countdown > 0) {
@@ -45,31 +44,67 @@
       return;
     }
 
+    // Validasi email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Email Tidak Valid',
+        text: 'Silakan masukkan email yang valid!',
+        confirmButtonColor: '#ef4444'
+      });
+      return;
+    }
+
     isSubmitting = true;
 
-    setTimeout(() => {
-      isSubmitting = false;
-      // Generate a mock 4-digit OTP
-      generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
-      
-      // Console log for developers
-      console.log(`[SIMULASI] OTP untuk ${email} adalah: ${generatedOtp}`);
-
-      Swal.fire({
-        icon: 'success',
-        title: 'OTP Terkirim!',
-        html: `Kode OTP berhasil dikirim ke <b>${email}</b>.<br><br><span class="text-sm text-gray-500">Kode Demo: <b class="text-blue-600 text-lg">${generatedOtp}</b></span>`,
-        confirmButtonColor: '#3b82f6'
-      }).then(() => {
-        currentStep = 2;
-        startCountdown();
-        // Reset code inputs
-        codes = ['', '', '', ''];
-        setTimeout(() => {
-          inputs[0]?.focus();
-        }, 100);
+    try {
+      const response = await fetch("/api/otp/forget", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email })
       });
-    }, 1000);
+
+      const data = await response.json();
+
+      if (response.status === 200) {
+        Swal.fire({
+          icon: 'success',
+          title: 'OTP Terkirim!',
+          html: `Kode OTP berhasil dikirim ke <b>${email}</b>.`,
+          confirmButtonColor: '#3b82f6'
+        }).then(() => {
+          currentStep = 2;
+          startCountdown();
+          codes = ['', '', '', ''];
+          setTimeout(() => {
+            inputs[0]?.focus();
+          }, 100);
+        });
+      } else {
+        // Tampilkan error dari backend
+        const errorMessage = data.errors || data.message || 'Gagal mengirim OTP';
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal Kirim OTP',
+          text: errorMessage,
+          confirmButtonColor: '#ef4444'
+        });
+      }
+    } catch (error) {
+      console.error("Error sending OTP:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
+        confirmButtonColor: '#ef4444'
+      });
+    } finally {
+      isSubmitting = false;
+    }
   }
 
   // Resend OTP
@@ -119,8 +154,9 @@
   }
 
   // Verify OTP
-  function handleVerifyOtp() {
+  async function handleVerifyOtp() {
     const enteredCode = codes.join('');
+    
     if (enteredCode.length < 4) {
       Swal.fire({
         icon: 'warning',
@@ -131,33 +167,59 @@
       return;
     }
 
-    if (enteredCode !== generatedOtp) {
+    isSubmitting = true;
+
+    try {
+      const response = await fetch("/api/otp/forget/verify", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          email,
+          otp: enteredCode 
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.status === 200) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Verifikasi Berhasil!',
+          text: 'Kode OTP benar. Silakan ubah password Anda.',
+          confirmButtonColor: '#3b82f6',
+          timer: 1500,
+          showConfirmButton: false
+        }).then(() => {
+          showModal = true;
+        });
+      } else {
+        const errorMessage = data.errors || data.message || 'Kode OTP yang Anda masukkan salah!';
+        Swal.fire({
+          icon: 'error',
+          title: 'Verifikasi Gagal',
+          text: errorMessage,
+          confirmButtonColor: '#ef4444'
+        });
+        codes = ['', '', '', ''];
+        inputs[0]?.focus();
+      }
+    } catch (error) {
+      console.error("Error verifying OTP:", error);
       Swal.fire({
         icon: 'error',
-        title: 'OTP Salah',
-        text: 'Kode OTP yang Anda masukkan salah, silakan coba lagi.',
+        title: 'Error',
+        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
         confirmButtonColor: '#ef4444'
       });
-      // Reset inputs
-      codes = ['', '', '', ''];
-      inputs[0]?.focus();
-      return;
+    } finally {
+      isSubmitting = false;
     }
-
-    // Handle Open change password modal
-    Swal.fire({
-      icon: 'success',
-      title: 'Verifikasi Berhasil!',
-      text: 'Kode OTP benar. Silakan ubah password Anda.',
-      confirmButtonColor: '#3b82f6',
-      timer: 1500,
-      showConfirmButton: false
-    }).then(() => {
-      showModal = true;
-    });
   }
 
-  // Handle  Reset Password Submit
+  // Handle Reset Password Submit
   async function handleResetPassword() {
     if (!newPassword || !confirmPassword) {
       Swal.fire({
@@ -191,26 +253,65 @@
 
     isSubmitting = true;
 
-    setTimeout(() => {
-      isSubmitting = false;
-      showModal = false;
-      Swal.fire({
-        icon: 'success',
-        title: 'Password Berhasil Diubah!',
-        text: 'Silakan gunakan password baru Anda untuk login.',
-        confirmButtonColor: '#0b5ba2',
-        timer: 2500,
-        showConfirmButton: true
-      }).then(() => {
-        push('/signin');
+    try {
+      // Kirim hanya password (email sudah ada di session dari OTP)
+      const response = await fetch("/api/forget/change", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          password: newPassword
+        })
       });
-    }, 1500);
+
+      const data = await response.json();
+
+      if (response.status === 200) {
+        showModal = false;
+        newPassword = '';
+        confirmPassword = '';
+        
+        Swal.fire({
+          icon: 'success',
+          title: 'Password Berhasil Diubah!',
+          text: 'Silakan gunakan password baru Anda untuk login.',
+          confirmButtonColor: '#0b5ba2',
+          timer: 2500,
+          showConfirmButton: false
+        }).then(() => {
+          // Redirect ke halaman login
+          push('/signin');
+        });
+      } else {
+        const errorMessage = data.errors || data.message || 'Gagal mengubah password';
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal Ubah Password',
+          text: errorMessage,
+          confirmButtonColor: '#ef4444'
+        });
+      }
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
+        confirmButtonColor: '#ef4444'
+      });
+    } finally {
+      isSubmitting = false;
+    }
   }
 
   // Back to Email Step
   function handleBackToEmail() {
     currentStep = 1;
     if (countdownTimer) clearInterval(countdownTimer);
+    email = '';
+    codes = ['', '', '', ''];
   }
 </script>
 
@@ -265,7 +366,8 @@
         <!-- Verifikasi OTP -->
         <form on:submit|preventDefault={handleVerifyOtp} class="p-6 space-y-6">
           <div class="text-center">
-            <p class="text-sm text-gray-400">Masukkan 4 digit kode verifikasi yang dikirim ke email</p>
+            <p class="text-sm text-gray-400">Masukkan 4 digit kode verifikasi yang dikirim ke</p>
+            <p class="text-sm font-semibold text-gray-700 mt-1">{email}</p>
           </div>
 
           <div class="flex justify-center gap-3">
@@ -279,17 +381,27 @@
                 on:input={(e) => handleInput(i, e)}
                 on:keydown={(e) => handleKeydown(i, e)}
                 on:paste={handlePaste}
+                disabled={isSubmitting}
                 class="code-input w-16 h-16 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl
                        focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all
-                       bg-white text-gray-800 shadow-sm"
+                       bg-white text-gray-800 shadow-sm disabled:opacity-50"
                 autocomplete="off"
               />
             {/each}
           </div>
 
           <div class="pt-2 flex flex-col gap-4">
-            <button type="submit" class="w-full bg-[#0b5ba2] hover:bg-[#0b4c8d] text-white font-bold py-3 rounded-2xl transition-colors tracking-wider">
-              VERIFIKASI
+            <button 
+              type="submit" 
+              disabled={isSubmitting}
+              class="w-full bg-[#0b5ba2] hover:bg-[#0b4c8d] text-white font-bold py-3 rounded-2xl transition-colors tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {#if isSubmitting}
+                <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Memverifikasi...
+              {:else}
+                VERIFIKASI
+              {/if}
             </button>
             
             <div class="text-center">
@@ -299,7 +411,8 @@
                 <button 
                   type="button" 
                   on:click={handleResendOtp}
-                  class="text-xs text-blue-600 hover:text-blue-800 font-bold transition-colors hover:underline"
+                  disabled={isSubmitting}
+                  class="text-xs text-blue-600 hover:text-blue-800 font-bold transition-colors hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Kirim Ulang Kode OTP
                 </button>
@@ -319,12 +432,13 @@
     </div>
   </div>
 
-  <!-- Ganti Password -->
+  <!-- Modal Ganti Password -->
   {#if showModal}
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div class="w-full max-w-md bg-white border border-gray-200 rounded-3xl shadow-xl overflow-hidden">
         <div class="text-center px-6 pt-8 pb-2">
           <p class="text-lg font-semibold text-gray-500">GANTI PASSWORD BARU</p>
+          <p class="text-sm text-gray-400 mt-1">Buat password baru untuk akun Anda</p>
         </div>
         
         <form on:submit|preventDefault={handleResetPassword} class="p-6 space-y-5">
@@ -378,7 +492,7 @@
             </div>
           </div>
           
-          <div class="pt-1 flex flex-col gap-4">
+          <div class="pt-1 flex flex-col gap-3">
             <button 
               type="submit" 
               disabled={isSubmitting}
@@ -386,14 +500,18 @@
             >
               {#if isSubmitting}
                 <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Menghubungkan...
+                Menyimpan...
               {:else}
                 SIMPAN PASSWORD
               {/if}
             </button>
             <button 
               type="button" 
-              on:click={() => showModal = false}
+              on:click={() => {
+                showModal = false;
+                newPassword = '';
+                confirmPassword = '';
+              }}
               class="w-full text-sm text-gray-500 hover:text-gray-700 font-semibold py-2 transition-colors"
             >
               Batal
