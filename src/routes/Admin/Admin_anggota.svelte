@@ -18,6 +18,14 @@
   let selectedTeamFilter = '';
   let selectedRoleFilter = '';
 
+  // State untuk Manage Team
+  let isManageTeamModalOpen = false;
+  let isEditingTeam = false;
+  let editingTeamId = null;
+  let editingTeamName = '';
+  let newTeamName = '';
+  let isSubmittingTeam = false;
+
   // Filter anggota berdasarkan pencarian, team, dan role
   $: filterAnggotaList = anggotaList.filter((orang) => {
     const matchName = orang.nama.toLowerCase().includes(searchQuery.toLowerCase());
@@ -102,7 +110,7 @@
     }
   }
 
-  // FETCH ANGGOTA - DIPERBAIKI TOTAL
+  // FETCH ANGGOTA
   async function fetchAnggota() {
     isLoading = true;
     errorMessage = "";
@@ -119,7 +127,6 @@
       const users = result.data || [];
       
       anggotaList = users.map(user => {
-        // CEK MEMBER dengan BENAR
         const hasTeam = user.member !== null && user.member !== undefined && user.member.team !== null;
         
         let teamName = "No Team";
@@ -135,7 +142,6 @@
           }
         }
         
-        // Cari teamId dari teamList berdasarkan nama tim
         let teamId = null;
         if (teamName !== "No Team") {
           const foundTeam = teamList.find(t => t.nama_tim === teamName);
@@ -155,7 +161,6 @@
       
       console.log("Anggota list:", anggotaList);
       
-      // Update statistik dari data yang sudah diproses
       const dalamTim = anggotaList.filter(a => a.status === "Dalam Tim").length;
       const tidakDalamTim = anggotaList.filter(a => a.status === "Tidak Dalam Tim").length;
       const uniqueTeams = [...new Set(anggotaList.filter(a => a.team !== "No Team").map(a => a.team))];
@@ -177,7 +182,6 @@
   }
 
   async function removeFromTeam(userId, teamId, userName, teamName) {
-    // Validasi teamId
     if (!teamId) {
       Swal.fire({ 
         icon: 'error', 
@@ -210,10 +214,9 @@
       
       Swal.fire({ icon: "success", title: "Berhasil!", text: `${userName} berhasil dihapus dari tim ${teamName}`, timer: 1500, showConfirmButton: false });
       
-      // Refresh data dengan urutan yang benar
-      await fetchTeamList();  // Refresh team list dulu
-      await fetchAnggota();   // Baru fetch anggota
-      await fetchStatistik(); // Terakhir statistik
+      await fetchTeamList();
+      await fetchAnggota();
+      await fetchStatistik();
       
     } catch (error) {
       console.error("Error removing member:", error);
@@ -253,7 +256,6 @@
       closeEditModal();
       Swal.fire({ icon: "success", title: "Berhasil!", text: `Anggota berhasil ditambahkan ke team ${formData.team} dengan role ${formData.position}`, timer: 1500, showConfirmButton: false });
       
-      // Refresh data
       await fetchTeamList();
       await fetchAnggota();
       await fetchStatistik();
@@ -278,7 +280,7 @@
       if (!response.ok) throw new Error("Gagal menambah team");
       
       closeModal();
-      Swal.fire({ icon: "success", title: "Berhasil!", text: `Team "${namaTeam}" berhasil ditambahkan.`, timer: 1500, showConfirmButton: false });
+      Swal.fire({ icon: "success", title: "Berhasil!", text: `Team berhasil ditambahkan.`, timer: 1500, showConfirmButton: false });
       
       await fetchTeamList();
       await fetchStatistik();
@@ -287,6 +289,172 @@
       console.error("Error adding team:", error);
       Swal.fire({ icon: "error", title: "Gagal!", text: "Gagal menambahkan team. Silakan coba lagi.", confirmButtonColor: "#ef4444" });
     }
+  }
+
+  
+  function openManageTeamModal() {
+    isManageTeamModalOpen = true;
+    isEditingTeam = false;
+    editingTeamId = null;
+    editingTeamName = '';
+    newTeamName = '';
+  }
+
+  function closeManageTeamModal() {
+    isManageTeamModalOpen = false;
+    isEditingTeam = false;
+    editingTeamId = null;
+    editingTeamName = '';
+    newTeamName = '';
+  }
+
+  function startEditTeam(team) {
+    isEditingTeam = true;
+    editingTeamId = team.id;
+    editingTeamName = team.nama_tim;
+    newTeamName = team.nama_tim;
+  }
+
+  async function deleteTeam(teamId, teamName) {
+    const result = await Swal.fire({
+      title: "Hapus Team?",
+      text: `Apakah Anda yakin ingin menghapus team "${teamName}"? Semua anggota dalam team ini akan kehilangan team.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#9ca3af",
+      confirmButtonText: "Ya, Hapus!",
+      cancelButtonText: "Batal"
+    });
+    
+    if (!result.isConfirmed) return;
+    
+    try {
+      const response = await fetch(`${TEAMS_API_URL}/${teamId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem("token")}` }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.errors || "Gagal menghapus team");
+      }
+      
+      Swal.fire({ 
+        icon: "success", 
+        title: "Berhasil!", 
+        text: `Team "${teamName}" berhasil dihapus.`, 
+        timer: 1500, 
+        showConfirmButton: false 
+      });
+      
+      await fetchTeamList();
+      await fetchAnggota();
+      await fetchStatistik();
+      
+      // Refresh manage team modal list
+      if (isManageTeamModalOpen) {
+        // Trigger re-render
+        isManageTeamModalOpen = false;
+        setTimeout(() => {
+          isManageTeamModalOpen = true;
+        }, 100);
+      }
+      
+    } catch (error) {
+      console.error("Error deleting team:", error);
+      Swal.fire({ 
+        icon: "error", 
+        title: "Gagal!", 
+        text: error.message || "Gagal menghapus team. Silakan coba lagi.", 
+        confirmButtonColor: "#ef4444" 
+      });
+    }
+  }
+
+  async function updateTeamName() {
+    if (!newTeamName.trim()) {
+      Swal.fire({ 
+        icon: "warning", 
+        title: "Nama Team Kosong", 
+        text: "Silakan masukkan nama team yang baru.", 
+        confirmButtonColor: "#ef4444" 
+      });
+      return;
+    }
+    
+    if (newTeamName.trim() === editingTeamName) {
+      Swal.fire({ 
+        icon: "info", 
+        title: "Tidak Ada Perubahan", 
+        text: "Nama team masih sama dengan sebelumnya.", 
+        confirmButtonColor: "#0b5ba2" 
+      });
+      return;
+    }
+    
+    isSubmittingTeam = true;
+    
+    try {
+      const response = await fetch(`${TEAMS_API_URL}/${editingTeamId}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem("token")}` 
+        },
+        credentials: 'include',
+        body: JSON.stringify({ nama_tim: newTeamName.trim() })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.errors || "Gagal mengupdate team");
+      }
+      
+      Swal.fire({ 
+        icon: "success", 
+        title: "Berhasil!", 
+        text: `Team berhasil diupdate menjadi "${newTeamName.trim()}".`, 
+        timer: 1500, 
+        showConfirmButton: false 
+      });
+      
+      isEditingTeam = false;
+      editingTeamId = null;
+      editingTeamName = '';
+      newTeamName = '';
+      
+      await fetchTeamList();
+      await fetchAnggota();
+      await fetchStatistik();
+      
+      // Refresh manage team modal list
+      if (isManageTeamModalOpen) {
+        isManageTeamModalOpen = false;
+        setTimeout(() => {
+          isManageTeamModalOpen = true;
+        }, 100);
+      }
+      
+    } catch (error) {
+      console.error("Error updating team:", error);
+      Swal.fire({ 
+        icon: "error", 
+        title: "Gagal!", 
+        text: error.message || "Gagal mengupdate team. Silakan coba lagi.", 
+        confirmButtonColor: "#ef4444" 
+      });
+    } finally {
+      isSubmittingTeam = false;
+    }
+  }
+
+  function cancelEditTeam() {
+    isEditingTeam = false;
+    editingTeamId = null;
+    editingTeamName = '';
+    newTeamName = '';
   }
 
   function resetFilters() {
@@ -311,7 +479,6 @@
       return;
     }
     
-    // Fetch data dengan urutan yang benar
     await fetchTeamList();
     await Promise.all([fetchAnggota(), fetchStatistik()]);
   });
@@ -537,12 +704,20 @@
             <div class="flex flex-col gap-4 px-6 py-5 border-b border-gray-100">
               <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h3 class="text-lg font-bold text-gray-800">Anggota</h3>
-                <button on:click={openModal} class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white whitespace-nowrap transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] hover:shadow-lg active:scale-95 w-full sm:w-auto">
-                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Buat Team
-                </button>
+                <div class="flex gap-2 w-full sm:w-auto">
+                  <button on:click={openManageTeamModal} class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white whitespace-nowrap transition-all bg-green-600 rounded-lg shadow-md hover:bg-green-700 hover:shadow-lg active:scale-95 w-full sm:w-auto">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Manage Team
+                  </button>
+                  <button on:click={openModal} class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white whitespace-nowrap transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] hover:shadow-lg active:scale-95 w-full sm:w-auto">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Buat Team
+                  </button>
+                </div>
               </div>
               
               <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -661,6 +836,7 @@
   </div>
 </div>
 
+<!-- MODAL BUAT TEAM -->
 {#if isModalOpen}
 <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in">
   <div class="absolute inset-0 cursor-pointer bg-black/40 backdrop-blur-sm" on:click={closeModal} aria-hidden="true"></div>
@@ -683,6 +859,7 @@
 </div>
 {/if}
 
+<!-- MODAL EDIT ANGGOTA -->
 {#if isEditModalOpen}
 <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in">
   <div class="absolute inset-0 cursor-pointer bg-black/40 backdrop-blur-sm" on:click={closeEditModal} aria-hidden="true"></div>
@@ -733,6 +910,133 @@
 </div>
 {/if}
 
+<!-- MODAL MANAGE TEAM -->
+{#if isManageTeamModalOpen}
+<div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+  <div class="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-sm" on:click={closeManageTeamModal} aria-hidden="true"></div>
+  <div class="relative flex flex-col w-full max-w-3xl max-h-[90vh] shadow-2xl bg-white rounded-xl">
+    <div class="flex items-center justify-between p-5 bg-white border-b border-gray-100 sm:p-6 rounded-t-xl">
+      <div>
+        <h3 class="text-lg font-extrabold text-gray-800 sm:text-xl">Manage Team</h3>
+        <p class="text-sm text-gray-500 mt-1">Kelola semua team yang tersedia</p>
+      </div>
+      <button on:click={closeManageTeamModal} class="flex items-center justify-center w-8 h-8 text-white transition-colors shadow-sm bg-[#0a2e52] hover:bg-red-600 rounded-md">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+    
+    <div class="flex-1 overflow-y-auto p-5 sm:p-6">
+      {#if teamList.length === 0}
+        <div class="flex flex-col items-center justify-center py-12 text-center">
+          <svg class="w-16 h-16 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <p class="text-gray-500 font-medium">Belum ada team yang dibuat</p>
+          <p class="text-sm text-gray-400 mt-1">Klik tombol "Buat Team" untuk membuat team baru</p>
+        </div>
+      {:else}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {#each teamList as team}
+            <div class="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all overflow-hidden">
+              {#if isEditingTeam && editingTeamId === team.id}
+                <!-- Edit Mode -->
+                <div class="p-4 bg-blue-50 border-b border-blue-100">
+                  <div class="flex items-center gap-2 mb-3">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    <span class="text-sm font-bold text-blue-700">Edit Team</span>
+                  </div>
+                  <input 
+                    type="text" 
+                    bind:value={newTeamName} 
+                    placeholder="Masukkan nama team baru"
+                    class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    on:keydown={(e) => { if (e.key === 'Enter') updateTeamName(); }}
+                  />
+                  <div class="flex gap-2 mt-3">
+                    <button 
+                      on:click={updateTeamName} 
+                      disabled={isSubmittingTeam}
+                      class="px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    >
+                      {#if isSubmittingTeam}
+                        <div class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Menyimpan...
+                      {:else}
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Simpan
+                      {/if}
+                    </button>
+                    <button 
+                      on:click={cancelEditTeam} 
+                      class="px-4 py-2 text-xs font-bold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </div>
+              {:else}
+                <!-- View Mode -->
+                <div class="p-4">
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <div class="flex items-center gap-2">
+                        <div class="w-10 h-10 rounded-full bg-[#0a2e52] flex items-center justify-center text-white font-bold text-sm">
+                          {team.nama_tim.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h4 class="font-bold text-gray-800">{team.nama_tim}</h4>
+                          <p class="text-xs text-gray-500">ID: {team.id}</p>
+                        </div>
+                      </div>
+                      <div class="mt-2 flex items-center gap-2">
+                        <span class="text-xs text-gray-500">Jumlah Anggota:</span>
+                        <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                          {anggotaList.filter(a => a.team === team.nama_tim).length}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="flex gap-1.5">
+                      <button 
+                        on:click={() => startEditTeam(team)} 
+                        class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit Team"
+                      >
+                        <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button 
+                        on:click={() => deleteTeam(team.id, team.nama_tim)} 
+                        class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Hapus Team"
+                      >
+                        <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+    
+    <div class="flex justify-end gap-3 p-5 bg-gray-50 border-t border-gray-100 sm:p-6 rounded-b-xl">
+      <button on:click={closeManageTeamModal} class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] active:scale-95">
+        Tutup
+      </button>
+    </div>
+  </div>
+</div>
+{/if}
+
 <style>
   .animate-fade-in {
     animation: fadeIn 0.2s ease-in-out;
@@ -741,5 +1045,12 @@
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+  
+  .w-4\.5 {
+    width: 1.125rem;
+  }
+  .h-4\.5 {
+    height: 1.125rem;
   }
 </style>
