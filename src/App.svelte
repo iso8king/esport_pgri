@@ -17,6 +17,18 @@
     import User_setting from './routes/User/User_setting.svelte';
     import User_analisis from './routes/User/User_analisis.svelte';
     import ForgetPassword from './routes/ForgetPassword.svelte';
+    import { onMount, onDestroy } from 'svelte';
+    import { initSession, stopSessionCheck, isAuthenticated } from '$lib/auth.js';
+
+    onMount(() => {
+        if (isAuthenticated()) {
+            initSession();
+        }
+    });
+
+    onDestroy(() => {
+        stopSessionCheck();
+    });
 
 
     const routes = {

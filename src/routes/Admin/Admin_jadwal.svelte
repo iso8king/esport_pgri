@@ -2,6 +2,7 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
+  import {fetchWithAuth} from "$lib/auth.js"
 
   let jadwalList = [];
   let isLoading = true;
@@ -43,7 +44,7 @@
 async function fetchJadwalData() {
   isLoading = true;
   try {
-    const response = await fetch('/api/kegiatan/', {
+    const response = await fetchWithAuth('/api/kegiatan/', {
       method: 'GET',
       credentials: 'include',
       headers: {
@@ -150,7 +151,7 @@ function formatDate(dateString) {
       const url = isEditing ? `/api/kegiatan/${editId}/update` : `/api/kegiatan/create`;
       const method = isEditing ? 'PATCH' : 'POST';
 
-      const response = await fetch(url, {
+      const response = await fetchWithAuth(url, {
         method: method,
         headers: {
           'Content-Type': 'application/json'
@@ -251,7 +252,7 @@ function formatDate(dateString) {
             }
           });
 
-          const response = await fetch(`/api/kegiatan/${id}/delete`, {
+          const response = await fetchWithAuth(`/api/kegiatan/${id}/delete`, {
             method: 'DELETE',
             credentials: 'include'
           });

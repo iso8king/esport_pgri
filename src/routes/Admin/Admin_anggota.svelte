@@ -2,6 +2,7 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
+  import {fetchWithAuth} from "$lib/auth.js"
 
   // State untuk menyimpan data anggota dari backend
   let anggotaList = [];
@@ -71,7 +72,7 @@
   // Fetch list team dari backend
   async function fetchTeamList() {
     try {
-      const response = await fetch(`${TEAMS_API_URL}/all`, {
+      const response = await fetchWithAuth(`${TEAMS_API_URL}/all`, {
         method: 'GET',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
@@ -89,7 +90,7 @@
   // Fetch statistik dari backend
   async function fetchStatistik() {
     try {
-      const response = await fetch(STATISTIK_API_URL, {
+      const response = await fetchWithAuth(STATISTIK_API_URL, {
         method: 'GET',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
@@ -115,7 +116,7 @@
     isLoading = true;
     errorMessage = "";
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetchWithAuth(API_URL, {
         method: 'GET',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' }
@@ -205,10 +206,9 @@
     if (!result.isConfirmed) return;
     
     try {
-      const response = await fetch(`${TEAMS_API_URL}/${teamId}/remove?userId=${userId}`, {
+      const response = await fetchWithAuth(`${TEAMS_API_URL}/${teamId}/remove?userId=${userId}`, {
         method: 'DELETE',
-        credentials: 'include',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem("token")}` }
+        credentials: 'include'
       });
       if (!response.ok) throw new Error("Gagal menghapus anggota dari tim");
       
@@ -242,9 +242,8 @@
       const backendRole = mapRoleToBackend(formData.position);
       const bodyData = { userId: formData.userId, role: backendRole };
       
-      const response = await fetch(`${TEAMS_API_URL}/${selectedTeam.id}/add`, {
+      const response = await fetchWithAuth(`${TEAMS_API_URL}/${selectedTeam.id}/add`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem("token")}` },
         credentials: 'include',
         body: JSON.stringify(bodyData)
       });
@@ -272,9 +271,8 @@
       return;
     }
     try {
-      const response = await fetch(`${TEAMS_API_URL}/create?nama_tim=${encodeURIComponent(namaTeam)}`, {
+      const response = await fetchWithAuth(`${TEAMS_API_URL}/create?nama_tim=${encodeURIComponent(namaTeam)}`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem("token")}` },
         credentials: 'include'
       });
       if (!response.ok) throw new Error("Gagal menambah team");
@@ -330,10 +328,9 @@
     if (!result.isConfirmed) return;
     
     try {
-      const response = await fetch(`${TEAMS_API_URL}/${teamId}`, {
+      const response = await fetchWithAuth(`${TEAMS_API_URL}/${teamId}`, {
         method: 'DELETE',
         credentials: 'include',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem("token")}` }
       });
       
       if (!response.ok) {
@@ -397,11 +394,10 @@
     isSubmittingTeam = true;
     
     try {
-      const response = await fetch(`${TEAMS_API_URL}/${editingTeamId}`, {
+      const response = await fetchWithAuth(`${TEAMS_API_URL}/${editingTeamId}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem("token")}` 
         },
         credentials: 'include',
         body: JSON.stringify({ nama_tim: newTeamName.trim() })

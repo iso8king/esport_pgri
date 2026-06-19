@@ -2,6 +2,7 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
+  import {fetchWithAuth} from "$lib/auth.js"
 
   let currentUserName = "Loading...";
   let kegiatanList = [];
@@ -118,7 +119,7 @@
     try {
       const userId = localStorage.getItem("user_id");
       
-      const response = await fetch(`/api/absen/get/complete?user_id=${userId}`, {
+      const response = await fetchWithAuth(`/api/absen/get/complete?user_id=${userId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -170,7 +171,7 @@
         return;
       }
 
-      const response = await fetch(`/api/kegiatan?user_id=${userId}&page=${page}`, {
+      const response = await fetchWithAuth(`/api/kegiatan?user_id=${userId}&page=${page}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -256,7 +257,7 @@
   // Kirim absen ke backend
   async function submitAbsenToBackend(kegiatanId, formData) {
     try {
-      const response = await fetch(`/api/absen/${kegiatanId}/create`, {
+      const response = await fetchWithAuth(`/api/absen/${kegiatanId}/create`, {
         method: 'POST',
         body: formData,
         credentials: 'include'

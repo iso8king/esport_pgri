@@ -2,6 +2,7 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
+  import {fetchWithAuth} from "$lib/auth.js"
 
   let currentUserName = "Loading...";
   let activeTab = "profile";
@@ -139,7 +140,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetch("/api/settings/hero", {
+      const response = await fetchWithAuth("/api/settings/hero", {
         method: "POST",
         credentials: "include",
         body: formData
@@ -225,7 +226,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetch("/api/settings/about-image", {
+      const response = await fetchWithAuth("/api/settings/about-image", {
         method: "POST",
         credentials: "include",
         body: formData
@@ -266,7 +267,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetch("/api/settings/about-text", {
+      const response = await fetchWithAuth("/api/settings/about-text", {
         method: "PATCH",
         credentials: "include",
         headers: {
@@ -369,7 +370,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetch("/api/settings/gallery", {
+      const response = await fetchWithAuth("/api/settings/gallery", {
         method: "POST",
         credentials: "include",
         body: formData
@@ -422,7 +423,7 @@
             didOpen: () => Swal.showLoading()
           });
 
-          const response = await fetch(`/api/settings/gallery/${id}`, {
+          const response = await fetchWithAuth(`/api/settings/gallery/${id}`, {
             method: "DELETE",
             credentials: "include"
           });
@@ -469,7 +470,7 @@
   async function sendOtpEmail() {
     isSendingOtp = true;
     try {
-      const response = await fetch("/api/users/request/otp", {
+      const response = await fetchWithAuth("/api/users/request/otp", {
         method: "POST",
         credentials: 'include'
       });
@@ -499,7 +500,7 @@
   // Verifikasi OTP
   async function verifyOtp(otpCode) {
     try {
-      const response = await fetch("/api/users/verify", {
+      const response = await fetchWithAuth("/api/users/verify", {
         method: "POST",
         headers: {
           'Content-Type': 'application/json'
@@ -566,7 +567,7 @@
         return true;
       }
       
-      const response = await fetch("/api/users/updateprofile", {
+      const response = await fetchWithAuth("/api/users/updateprofile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dataToSend),
@@ -624,7 +625,7 @@
   // Update password ke server
   async function updatePasswordToServer(passwordData) {
     try {
-      const response = await fetch("/api/users/update/password", {
+      const response = await fetchWithAuth("/api/users/update/password", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -803,7 +804,7 @@
     isSendingOtp = true;
     try {
       // Verifikasi password saat ini ke backend terlebih dahulu
-      const checkResponse = await fetch("/api/users/check-password", {
+      const checkResponse = await fetchWithAuth("/api/users/check-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: password.current }),

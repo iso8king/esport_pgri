@@ -2,6 +2,7 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
+  import {fetchWithAuth} from "$lib/auth.js"
 
   // State untuk data dari backend
   let anggotaList = [];
@@ -29,7 +30,7 @@
     errorMessage = "";
     
     try {
-      const response = await fetch('/api/statistik', {
+      const response = await fetchWithAuth('/api/statistik', {
         method: 'GET',
         credentials: 'include',
         headers: {

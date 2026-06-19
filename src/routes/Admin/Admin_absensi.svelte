@@ -2,6 +2,7 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
+  import {fetchWithAuth} from "$lib/auth.js"
 
   let currentUserName = "Loading...";
 
@@ -34,7 +35,7 @@
   async function fetchKegiatanData() {
     isLoading = true;
     try {
-      const response = await fetch('/api/kegiatan/', {
+      const response = await fetchWithAuth('/api/kegiatan/', {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -82,7 +83,7 @@
   async function fetchAllTotalHadir() {
     for (const jadwal of jadwalAbsen) {
       try {
-        const response = await fetch(`/api/absen/${jadwal.id}/get`, {
+        const response = await fetchWithAuth(`/api/absen/${jadwal.id}/get`, {
           method: 'GET',
           credentials: 'include',
           headers: {
@@ -105,7 +106,7 @@
   // Fungsi untuk mengambil total user dari database
   async function fetchTotalUser() {
     try {
-      const response = await fetch('/api/statistik', {
+      const response = await fetchWithAuth('/api/statistik', {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -129,7 +130,7 @@
   // Fungsi untuk mengambil detail absen berdasarkan kegiatan
   async function fetchDetailAbsen(kegiatanId) {
     try {
-      const response = await fetch(`/api/absen/${kegiatanId}/get`, {
+      const response = await fetchWithAuth(`/api/absen/${kegiatanId}/get`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -199,7 +200,7 @@
         }
       });
       
-      const response = await fetch(`/api/absen/export?id_kegiatan=${selectedJadwal.id}`, {
+      const response = await fetchWithAuth(`/api/absen/export?id_kegiatan=${selectedJadwal.id}`, {
         method: 'GET',
         credentials: 'include',
         headers: {
