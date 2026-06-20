@@ -229,6 +229,17 @@
       Swal.fire({ icon: "warning", title: "Data Belum Lengkap", text: "Pastikan semua pilihan telah diisi!" });
       return;
     }
+
+    if (formData.team === originalFormData.team && formData.position === originalFormData.position) {
+      Swal.fire({
+        icon: "info",
+        title: "Tidak Ada Perubahan",
+        text: "Tidak ada data yang diubah untuk disimpan.",
+        confirmButtonColor: "#0b5ba2"
+      });
+      return;
+    }
+
     try {
       if (formData.team === "No Team") {
         Swal.fire({ icon: "info", title: "Info", text: "Fitur hapus dari team akan segera tersedia." });
@@ -524,6 +535,7 @@
 
   let isEditModalOpen = false;
   let formData = { userId: "", nama: "", team: "", teamId: "", position: "", status: "" };
+  let originalFormData = { team: "", position: "" };
 
   function openEditModal(orang) {
     formData = { 
@@ -533,6 +545,10 @@
       teamId: orang.teamId,
       position: orang.position,
       status: orang.status,
+    };
+    originalFormData = {
+      team: orang.team,
+      position: orang.position
     };
     isEditModalOpen = true;
   }
@@ -702,16 +718,8 @@
                 <h3 class="text-lg font-bold text-gray-800">Anggota</h3>
                 <div class="flex gap-2 w-full sm:w-auto">
                   <button on:click={openManageTeamModal} class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white whitespace-nowrap transition-all bg-green-600 rounded-lg shadow-md hover:bg-green-700 hover:shadow-lg active:scale-95 w-full sm:w-auto">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
+
                     Manage Team
-                  </button>
-                  <button on:click={openModal} class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white whitespace-nowrap transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] hover:shadow-lg active:scale-95 w-full sm:w-auto">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Buat Team
                   </button>
                 </div>
               </div>
@@ -833,7 +841,7 @@
 </div>
 
 <!-- MODAL BUAT TEAM -->
-{#if isModalOpen}
+<!-- {#if isModalOpen}
 <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in">
   <div class="absolute inset-0 cursor-pointer bg-black/40 backdrop-blur-sm" on:click={closeModal} aria-hidden="true"></div>
   <div class="relative flex flex-col w-full max-w-md shadow-2xl bg-white rounded-xl">
@@ -853,7 +861,7 @@
     </div>
   </div>
 </div>
-{/if}
+{/if} -->
 
 <!-- MODAL EDIT ANGGOTA -->
 {#if isEditModalOpen}
@@ -938,9 +946,6 @@
                 <!-- Edit Mode -->
                 <div class="p-4 bg-blue-50 border-b border-blue-100">
                   <div class="flex items-center gap-2 mb-3">
-                    <svg class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
                     <span class="text-sm font-bold text-blue-700">Edit Team</span>
                   </div>
                   <input 
@@ -954,7 +959,7 @@
                     <button 
                       on:click={updateTeamName} 
                       disabled={isSubmittingTeam}
-                      class="px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                      class="px-4 py-2 text-xs font-bold text-white bg-[#0a2e52] rounded-lg hover:bg-blue-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                     >
                       {#if isSubmittingTeam}
                         <div class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -985,7 +990,6 @@
                         </div>
                         <div>
                           <h4 class="font-bold text-gray-800">{team.nama_tim}</h4>
-                          <p class="text-xs text-gray-500">ID: {team.id}</p>
                         </div>
                       </div>
                       <div class="mt-2 flex items-center gap-2">
@@ -1025,14 +1029,43 @@
     </div>
     
     <div class="flex justify-end gap-3 p-5 bg-gray-50 border-t border-gray-100 sm:p-6 rounded-b-xl">
-      <button on:click={closeManageTeamModal} class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] active:scale-95">
+
+      <button on:click={closeManageTeamModal} class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-red-600 rounded-lg shadow-md hover:bg-red-700 active:scale-95">
         Tutup
       </button>
+        <button on:click={openModal} class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white whitespace-nowrap transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] active:scale-95 w-full sm:w-auto">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Buat Team
+        </button>
     </div>
   </div>
 </div>
 {/if}
 
+<!-- MODAL BUAT TEAM -->
+{#if isModalOpen}
+<div class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+  <div class="absolute inset-0 cursor-pointer bg-black/40 backdrop-blur-sm" on:click={closeModal} aria-hidden="true"></div>
+  <div class="relative flex flex-col w-full max-w-md shadow-2xl bg-white rounded-xl">
+    <div class="flex items-center justify-between p-5 bg-white border-b border-gray-100 sm:p-6 rounded-t-xl">
+      <h3 class="text-lg font-extrabold text-gray-800 sm:text-xl">Buat Team Baru</h3>
+      <button on:click={closeModal} class="flex items-center justify-center w-8 h-8 text-white transition-colors shadow-sm bg-[#0a2e52] hover:bg-red-600 rounded-md">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+    <div class="p-5 space-y-4 sm:p-6">
+      <label for="namaTeam" class="block mb-2 text-sm font-bold text-gray-700">Nama Team</label>
+      <input type="text" id="namaTeam" bind:value={namaTeam} placeholder="Masukkan nama team di sini..." class="w-full px-4 py-2.5 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0a4682] focus:bg-white transition-all" />
+    </div>
+    <div class="flex justify-end gap-3 p-5 bg-gray-50 border-t border-gray-100 sm:p-6 rounded-b-xl">
+      <button on:click={closeModal} class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-red-600 rounded-lg shadow-md hover:bg-red-700 active:scale-95">Batal</button>
+      <button on:click={submitTeam} class="px-6 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] active:scale-95">Submit</button>
+    </div>
+  </div>
+</div>
+{/if}
 <style>
   .animate-fade-in {
     animation: fadeIn 0.2s ease-in-out;
