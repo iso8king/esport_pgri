@@ -237,7 +237,7 @@
   // Kirim absen ke backend
   async function submitAbsenToBackend(kegiatanId, formData) {
     try {
-      const response = await fetchWithAuth(`/api/absen/${kegiatanId}/create`, {
+      const response = await fetch(`/api/absen/${kegiatanId}/create`, {
         method: 'POST',
         body: formData,
         credentials: 'include'
