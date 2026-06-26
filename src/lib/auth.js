@@ -130,13 +130,15 @@ async function showSessionWarning() {
 // ============================================
 export async function fetchWithAuth(url, options = {}) {
   try {
+    const headers = { ...options.headers };
+    if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     const response = await fetch(url, {
       ...options,
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      }
+      headers
     });
     
     // Handle 403 - JWT not valid
@@ -180,12 +182,14 @@ export async function fetchWithAuth(url, options = {}) {
 // ============================================
 export async function fetchPublic(url, options = {}) {
   try {
+    const headers = { ...options.headers };
+    if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     const response = await fetch(url, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      }
+      headers
     });
     return response;
   } catch (error) {

@@ -2,6 +2,7 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
+  import AnalisisDashboard from "../../lib/AnalisisDashboard.svelte";
 
   let currentUserName = "Loading...";
   let isLoading = true;
@@ -161,12 +162,7 @@
       </header>
 
       <main class="flex-1 p-4 overflow-x-hidden overflow-y-auto sm:p-6 lg:p-10 bg-[#fbfcfd]">
-        <div class="max-w-4xl mx-auto space-y-8">
-          <h1 class="text-3xl font-black tracking-tight text-gray-800 md:text-4xl lg:text-5xl">Analisis</h1>
-          <div class="p-6 bg-white border border-gray-100 shadow-sm sm:p-8 rounded-2xl">
-            <p class="text-base font-semibold text-gray-400 text-center">Fitur Analisis sedang dalam pengembangan.</p>
-          </div>
-        </div>
+        <AnalisisDashboard />
       </main>
     </div>
   </div>
