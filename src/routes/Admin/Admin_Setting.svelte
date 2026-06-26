@@ -140,7 +140,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetchWithAuth("/api/settings/hero", {
+      const response = await fetch("/api/settings/hero", {
         method: "POST",
         credentials: "include",
         body: formData
@@ -226,7 +226,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetchWithAuth("/api/settings/about-image", {
+      const response = await fetch("/api/settings/about-image", {
         method: "POST",
         credentials: "include",
         body: formData
@@ -267,7 +267,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetchWithAuth("/api/settings/about-text", {
+      const response = await fetch("/api/settings/about-text", {
         method: "PATCH",
         credentials: "include",
         headers: {
@@ -370,7 +370,7 @@
         didOpen: () => Swal.showLoading()
       });
 
-      const response = await fetchWithAuth("/api/settings/gallery", {
+      const response = await fetch("/api/settings/gallery", {
         method: "POST",
         credentials: "include",
         body: formData
@@ -423,7 +423,7 @@
             didOpen: () => Swal.showLoading()
           });
 
-          const response = await fetchWithAuth(`/api/settings/gallery/${id}`, {
+          const response = await fetch(`/api/settings/gallery/${id}`, {
             method: "DELETE",
             credentials: "include"
           });
