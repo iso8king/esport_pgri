@@ -3,7 +3,7 @@
   import Swal from "sweetalert2";
 
   // API Config
-  const API_URL = "https://mlbb.rone.dev/api";
+  const API_URL = "https://openmlbb.fastapicloud.dev/api";
 
   // Tab State
   let activeTab = "meta"; // "meta" | "counter" | "synergy" | "match"
@@ -59,10 +59,29 @@
   let analysisHeroItemAdvice = "";
   let activeChartMetric = "damage"; // "damage" | "teamfight"
 
+  let isMounted = false;
+  let hasShownApiError = false;
+  let apiErrorTimeout;
+  function showApiErrorAlert(message) {
+    if (hasShownApiError) return;
+    hasShownApiError = true;
+    Swal.fire({
+      icon: "error",
+      title: "Koneksi API Gagal",
+      text: message,
+      confirmButtonColor: "#0a2e52"
+    });
+    clearTimeout(apiErrorTimeout);
+    apiErrorTimeout = setTimeout(() => {
+      hasShownApiError = false;
+    }, 3000);
+  }
+
   // Filtered heroes list for autocomplete search
   $: searchedHeroes = searchQuery.trim() === "" 
     ? heroesList 
     : heroesList.filter(h => h.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
 
   // Fetch all heroes for search lookup
   async function fetchAllHeroes() {
@@ -78,9 +97,13 @@
           head: r.data?.hero?.data?.head || ""
         })).sort((a, b) => a.name.localeCompare(b.name));
         console.log("Cached heroes count:", heroesList.length);
+      } else {
+        throw new Error("Heroes API returned error status");
       }
     } catch (err) {
       console.error("Error fetching heroes list:", err);
+      heroesList = [];
+      showApiErrorAlert("Gagal mengambil daftar hero dari server API.");
     } finally {
       loadingAllHeroes = false;
     }
@@ -105,9 +128,14 @@
           banRate: r.data?.main_hero_ban_rate || 0,
           subHeroes: r.data?.sub_hero || []
         }));
+      } else {
+        throw new Error(`HTTP error ${res.status}`);
       }
     } catch (err) {
       console.error("Error fetching meta statistics:", err);
+      metaHeroes = [];
+      totalMetaCount = 0;
+      showApiErrorAlert("Gagal mengambil data statistik meta dari server API.");
     } finally {
       loadingMeta = false;
     }
@@ -127,9 +155,11 @@
         const json = await counterRes.json();
         const recordData = json.data?.records?.[0]?.data || {};
         counterData = {
-          strongAgainst: recordData.sub_hero || [], // Hero that counters the selected hero
-          weakAgainst: recordData.sub_hero_last || [] // Hero that is countered by the selected hero
+          strongAgainst: recordData.sub_hero || [], 
+          weakAgainst: recordData.sub_hero_last || [] 
         };
+      } else {
+        throw new Error("Counters API returned error status");
       }
 
       // 2. Fetch synergies (compatibility)
@@ -141,14 +171,14 @@
           bestPartners: recordData.sub_hero || [],
           worstPartners: recordData.sub_hero_last || []
         };
+      } else {
+        throw new Error("Synergies API returned error status");
       }
     } catch (err) {
       console.error("Error loading hero details:", err);
-      Swal.fire({
-        icon: "error",
-        title: "Gagal memuat data",
-        text: "Koneksi ke API MLBB terputus. Silakan coba lagi."
-      });
+      counterData = null;
+      compatibilityData = null;
+      showApiErrorAlert("Gagal memuat detail counter dan sinergi hero dari server API.");
     } finally {
       loadingDetail = false;
     }
@@ -171,7 +201,7 @@
   }
 
   // Triggers when filters change
-  $: if (filterDays || filterRank || filterSort || currentPage) {
+  $: if (isMounted && (filterDays || filterRank || filterSort || currentPage)) {
     if (activeTab === "meta") {
       fetchMetaStats();
     }
@@ -188,6 +218,7 @@
     if (mlbbJwt) {
       loadMatchesHistory();
     }
+    isMounted = true;
   });
 
   // Tab switcher
@@ -216,7 +247,12 @@
   // 1. Send VC Code to Game Box
   async function sendVc() {
     if (!mlbbRoleid || !mlbbZoneid) {
-      Swal.fire("Peringatan", "Game ID dan Zone ID tidak boleh kosong!", "warning");
+      Swal.fire({
+        icon: "warning",
+        title: "Peringatan",
+        text: "Game ID dan Zone ID tidak boleh kosong!",
+        confirmButtonColor: "#0a2e52"
+      });
       return;
     }
     
@@ -244,7 +280,12 @@
       }
     } catch (err) {
       console.error(err);
-      Swal.fire("Error", err.message || "Gagal menghubungi server MLBB.", "error");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: err.message || "Gagal menghubungi server MLBB.",
+        confirmButtonColor: "#0a2e52"
+      });
     } finally {
       loadingSendVc = false;
     }
@@ -253,7 +294,12 @@
   // 2. Submit Verification Code to Log In and get JWT
   async function loginMlbb() {
     if (!verificationCode) {
-      Swal.fire("Peringatan", "Masukkan kode verifikasi terlebih dahulu!", "warning");
+      Swal.fire({
+        icon: "warning",
+        title: "Peringatan",
+        text: "Masukkan kode verifikasi terlebih dahulu!",
+        confirmButtonColor: "#0a2e52"
+      });
       return;
     }
 
@@ -296,7 +342,12 @@
       }
     } catch (err) {
       console.error(err);
-      Swal.fire("Gagal Login", err.message, "error");
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Login",
+        text: err.message,
+        confirmButtonColor: "#0a2e52"
+      });
     } finally {
       loadingLogin = false;
     }
@@ -391,7 +442,12 @@
       }
     } catch (err) {
       console.error(err);
-      Swal.fire("Gagal Memuat Detail", "Pastikan Battle ID pertandingan valid dan sesuai season ini.", "error");
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Memuat Detail",
+        text: "Pastikan Battle ID pertandingan valid dan sesuai season ini.",
+        confirmButtonColor: "#0a2e52"
+      });
     } finally {
       loadingMatchDetail = false;
     }
@@ -452,9 +508,13 @@
           winRate: sub.hero_win_rate,
           increase: sub.increase_win_rate
         }));
+      } else {
+        throw new Error(`API error ${res.status}`);
       }
     } catch (err) {
       console.error("Error loading counters for analysis hero:", err);
+      analysisHeroCounters = [];
+      showApiErrorAlert("Gagal memuat rekomendasi counter-pick hero dari server API.");
     } finally {
       loadingAnalysisHeroCounters = false;
     }
@@ -484,7 +544,12 @@
     analysisHeroItemAdvice = "";
     vcSent = false;
     verificationCode = "";
-    Swal.fire("Terputus", "Koneksi akun MLBB berhasil dibersihkan.", "info");
+    Swal.fire({
+      icon: "info",
+      title: "Terputus",
+      text: "Koneksi akun MLBB berhasil dibersihkan.",
+      confirmButtonColor: "#0a2e52"
+    });
   }
 
   // Helper formatting match date

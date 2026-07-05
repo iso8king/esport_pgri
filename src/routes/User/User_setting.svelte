@@ -676,9 +676,185 @@
     { id: "profile", label: "Profil", icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
     { id: "password", label: "Keamanan", icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" },
   ];
-</script>
 
-<!-- HTML SAMA PERSIS SEPERTI KODE ANDA, TIDAK ADA PERUBAHAN -->
+  // Profile Picture variables & handlers
+  let userAvatar = "";
+  let isCropModalOpen = false;
+  let imageSrc = "";
+  let scale = 1;
+  let posX = 0;
+  let posY = 0;
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let canvasEl;
+
+  function triggerFileInput() {
+    const input = document.getElementById("avatar-input");
+    if (input) input.click();
+  }
+
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        imageSrc = event.target.result;
+        isCropModalOpen = true;
+        scale = 1;
+        posX = 0;
+        posY = 0;
+        // Wait for DOM update so canvasEl is resolved, then draw
+        setTimeout(drawCanvas, 100);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function drawCanvas() {
+    if (!canvasEl || !imageSrc) return;
+    const ctx = canvasEl.getContext("2d");
+    const img = new Image();
+    img.src = imageSrc;
+    img.onload = () => {
+      // Clear canvas
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      
+      // Fill canvas background with light gray color
+      ctx.fillStyle = "#f3f4f6";
+      ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+      
+      const baseSize = Math.min(img.width, img.height);
+      const initScale = 200 / baseSize;
+      const drawWidth = img.width * initScale * scale;
+      const drawHeight = img.height * initScale * scale;
+      
+      const x = (150 - drawWidth / 2) + posX;
+      const y = (150 - drawHeight / 2) + posY;
+
+      // 1. Draw the blurred and slightly darkened background (outside frame effect)
+      ctx.save();
+      ctx.filter = "blur(8px) brightness(0.65)";
+      ctx.drawImage(img, x, y, drawWidth, drawHeight);
+      ctx.restore();
+
+      // 2. Draw the sharp, clean image inside the circular crop path
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(150, 150, 100, 0, Math.PI * 2);
+      ctx.clip();
+
+      ctx.fillStyle = "#fafafa";
+      ctx.fillRect(50, 50, 200, 200);
+
+      ctx.filter = "none";
+      ctx.drawImage(img, x, y, drawWidth, drawHeight);
+      ctx.restore();
+
+      // 3. Draw outline of the circular frame guide
+      ctx.beginPath();
+      ctx.arc(150, 150, 100, 0, Math.PI * 2);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    };
+  }
+
+  function handleMouseDown(e) {
+    if (!isCropModalOpen) return;
+    isDragging = true;
+    startX = e.clientX - posX;
+    startY = e.clientY - posY;
+  }
+
+  function handleMouseMove(e) {
+    if (!isDragging) return;
+    posX = e.clientX - startX;
+    posY = e.clientY - startY;
+    drawCanvas();
+  }
+
+  function handleMouseUp() {
+    isDragging = false;
+  }
+
+  // Touch support for mobile dragging
+  function handleTouchStart(e) {
+    if (!isCropModalOpen || e.touches.length === 0) return;
+    isDragging = true;
+    startX = e.touches[0].clientX - posX;
+    startY = e.touches[0].clientY - posY;
+  }
+
+  function handleTouchMove(e) {
+    if (!isDragging || e.touches.length === 0) return;
+    e.preventDefault(); // Prevent scrolling while dragging
+    posX = e.touches[0].clientX - startX;
+    posY = e.touches[0].clientY - startY;
+    drawCanvas();
+  }
+
+  function handleTouchEnd() {
+    isDragging = false;
+  }
+
+  function handleZoom(e) {
+    scale = Number(e.target.value);
+    drawCanvas();
+  }
+
+  function uploadAvatar() {
+    if (!canvasEl || !imageSrc) return;
+    
+    // Create a temporary canvas to get the 200x200 cropped area
+    const outputCanvas = document.createElement("canvas");
+    outputCanvas.width = 200;
+    outputCanvas.height = 200;
+    const oCtx = outputCanvas.getContext("2d");
+
+    // We draw from canvasEl coordinates (50, 50, 200, 200) onto outputCanvas (0, 0, 200, 200)
+    oCtx.fillStyle = "#ffffff";
+    oCtx.fillRect(0, 0, 200, 200);
+
+    const img = new Image();
+    img.src = imageSrc;
+    img.onload = () => {
+      oCtx.save();
+      // Draw clipping circle for output file
+      oCtx.beginPath();
+      oCtx.arc(100, 100, 100, 0, Math.PI * 2);
+      oCtx.clip();
+
+      const baseSize = Math.min(img.width, img.height);
+      const initScale = 200 / baseSize;
+      const drawWidth = img.width * initScale * scale;
+      const drawHeight = img.height * initScale * scale;
+
+      // Adjust positioning (center on 100, 100 instead of 150, 150)
+      const x = (100 - drawWidth / 2) + posX;
+      const y = (100 - drawHeight / 2) + posY;
+
+      oCtx.drawImage(img, x, y, drawWidth, drawHeight);
+      oCtx.restore();
+
+      // Convert to compressed JPEG data URL (extremely small storage size)
+      const compressedDataUrl = outputCanvas.toDataURL("image/jpeg", 0.7);
+
+      // Update in-memory state for temporary session preview
+      userAvatar = compressedDataUrl;
+      isCropModalOpen = false;
+
+      // Show success popup
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Foto profil Anda berhasil diganti.",
+        confirmButtonColor: "#0a2e52"
+      });
+
+    };
+  }
+</script>
 <svelte:window bind:innerWidth />
 
 <div class="flex h-screen overflow-hidden font-sans bg-gray-50">
@@ -727,9 +903,13 @@
       </div>
       <div class="relative">
         <button on:click={toggleDropdown} class="flex items-center gap-2 px-2 py-1 transition-colors rounded-md cursor-pointer md:gap-3 hover:bg-gray-50 focus:outline-none">
-          <div class="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center">
-            <span class="text-lg font-bold text-black">{currentUserName.charAt(0).toUpperCase()}</span>
-          </div>
+          {#if userAvatar}
+            <img src={userAvatar} alt="Profile" class="w-11 h-11 rounded-full object-cover border border-gray-200 shadow-sm" />
+          {:else}
+            <div class="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center">
+              <span class="text-lg font-bold text-black">{currentUserName.charAt(0).toUpperCase()}</span>
+            </div>
+          {/if}
           <span class="text-sm font-bold text-gray-700">{currentUserName}</span>
           <svg class="w-4 h-4 text-gray-400 transition-transform duration-200 {isDropdownOpen ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
         </button>
@@ -764,8 +944,21 @@
     >
       <div class="relative z-10 flex flex-col items-center gap-4 sm:flex-row sm:items-center">
         
-        <div class="flex items-center justify-center w-20 h-20 text-3xl font-black rounded-full bg-white/20 border-2 border-white/40 shrink-0">
-          {currentUserName.charAt(0).toUpperCase()}
+        <div class="relative group cursor-pointer shrink-0" on:click={triggerFileInput} title="Tekan untuk mengubah foto profil">
+          {#if userAvatar}
+            <img src={userAvatar} alt="Profile" class="w-20 h-20 rounded-full border-2 border-white/40 object-cover shadow-md" />
+          {:else}
+            <div class="flex items-center justify-center w-20 h-20 text-3xl font-black rounded-full bg-white/20 border-2 border-white/40">
+              {currentUserName.charAt(0).toUpperCase()}
+            </div>
+          {/if}
+          <!-- Hover Overlay trigger -->
+          <div class="absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
         </div>
         
         <div class="text-center sm:text-left">
@@ -994,9 +1187,79 @@
         </button>
       </div>
     </div>
-
   </div>
 </div>
+{/if}
+
+<!-- Hidden Avatar file input -->
+<input type="file" id="avatar-input" accept="image/*" class="hidden" on:change={handleFileSelect} />
+
+<!-- Modal Cropper (Framing Bulat) -->
+{#if isCropModalOpen}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl border border-gray-100 flex flex-col">
+      <!-- Header -->
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-extrabold text-gray-800 text-lg">Sesuaikan Foto Profil</h3>
+        <button on:click={() => isCropModalOpen = false} class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Canvas Area -->
+      <div class="p-6 flex flex-col items-center justify-center bg-gray-50 border-b border-gray-100">
+        <p class="text-xs text-gray-500 mb-4 text-center">Geser foto dengan mouse/jari</p>
+        
+        <div 
+          class="relative w-[300px] h-[300px] bg-gray-100 rounded-xl overflow-hidden shadow-inner border border-gray-200 cursor-move select-none"
+          on:mousedown={handleMouseDown}
+          on:mousemove={handleMouseMove}
+          on:mouseup={handleMouseUp}
+          on:mouseleave={handleMouseUp}
+          on:touchstart={handleTouchStart}
+          on:touchmove={handleTouchMove}
+          on:touchend={handleTouchEnd}
+        >
+          <canvas bind:this={canvasEl} width="300" height="300" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+        </div>
+
+        <!-- Slider Zoom -->
+        <div class="w-full mt-6 space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold text-gray-600">
+            <span>Perkecil</span>
+            <span>Perbesar</span>
+          </div>
+          <input 
+            type="range" 
+            min="0.5" 
+            max="3" 
+            step="0.05" 
+            value={scale} 
+            on:input={handleZoom} 
+            class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0a2e52]" 
+          />
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="px-5 py-4 bg-gray-50 flex items-center justify-end gap-3">
+        <button 
+          on:click={() => isCropModalOpen = false} 
+          class="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          Batal
+        </button>
+        <button 
+          on:click={uploadAvatar} 
+          class="px-5 py-2 text-sm font-bold text-white bg-[#0a2e52] hover:bg-[#0c5599] rounded-lg shadow-md active:scale-95 transition-all"
+        >
+          Simpan Foto
+        </button>
+      </div>
+    </div>
+  </div>
 {/if}
 
 <style>

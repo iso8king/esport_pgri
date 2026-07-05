@@ -5,6 +5,7 @@
   import {fetchWithAuth} from "$lib/auth.js"
   
   let currentUserName = "Loading...";
+  let userAvatar = "";
   let activeTab = "tersedia";
   let isLoading = true;
 
@@ -587,9 +588,13 @@
 
       <div class="relative">
         <button on:click={toggleDropdown} class="flex items-center gap-2 px-2 py-1 transition-colors rounded-md cursor-pointer md:gap-3 hover:bg-gray-50 focus:outline-none">
-          <div class="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center">
-            <span class="text-lg font-bold text-black">{currentUserName.charAt(0).toUpperCase()}</span>
-          </div>
+          {#if userAvatar}
+            <img src={userAvatar} alt="Profile" class="w-11 h-11 rounded-full object-cover border border-gray-200 shadow-sm" />
+          {:else}
+            <div class="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center">
+              <span class="text-lg font-bold text-black">{currentUserName.charAt(0).toUpperCase()}</span>
+            </div>
+          {/if}
           <span class="text-sm font-bold text-gray-700">{currentUserName}</span>
           <svg class="w-4 h-4 text-gray-400 transition-transform duration-200 {isDropdownOpen ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
