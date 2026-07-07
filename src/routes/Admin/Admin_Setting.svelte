@@ -55,6 +55,270 @@
   let isSendingOtp = false;
   let otpTimestamp = null;
 
+  // ============ PFP (Profile Picture) Variables & Handlers ============
+  let userPfp = "";
+  let isCropModalOpen = false;
+  let imageSrc = "";
+  let scale = 1;
+  let posX = 0;
+  let posY = 0;
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let canvasEl;
+  let isUploadingPfp = false;
+
+  // Ambil PFP dari localStorage dan tampilkan melalui proxy
+  function getPfp() {
+    const pfp = localStorage.getItem("user_avatar");
+    if (pfp && pfp !== "null" && pfp !== "undefined") {
+      const timestamp = Date.now();
+      return `/avatar/${pfp}?t=${timestamp}`;
+    }
+    return "";
+  }
+
+  // Refresh PFP
+  function refreshPfp() {
+    const pfp = localStorage.getItem("user_avatar");
+    if (pfp && pfp !== "null" && pfp !== "undefined") {
+      const timestamp = Date.now();
+      userPfp = `/avatar/${pfp}?t=${timestamp}`;
+      userPfp = userPfp;
+    } else {
+      userPfp = "";
+    }
+  }
+
+  function triggerFileInput() {
+    const input = document.getElementById("pfp-input");
+    if (input) input.click();
+  }
+
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Format Tidak Didukung',
+          text: 'Silakan upload file JPG, PNG, GIF, atau WebP',
+          confirmButtonColor: '#0b5ba2'
+        });
+        e.target.value = '';
+        return;
+      }
+      
+      if (file.size > 2 * 1024 * 1024) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Ukuran Terlalu Besar',
+          text: 'Maksimal ukuran file adalah 2MB',
+          confirmButtonColor: '#0b5ba2'
+        });
+        e.target.value = '';
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        imageSrc = event.target.result;
+        isCropModalOpen = true;
+        scale = 1;
+        posX = 0;
+        posY = 0;
+        setTimeout(drawCanvas, 100);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function drawCanvas() {
+    if (!canvasEl || !imageSrc) return;
+    const ctx = canvasEl.getContext("2d");
+    const img = new Image();
+    img.src = imageSrc;
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      ctx.fillStyle = "#f3f4f6";
+      ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+      
+      const baseSize = Math.min(img.width, img.height);
+      const initScale = 200 / baseSize;
+      const drawWidth = img.width * initScale * scale;
+      const drawHeight = img.height * initScale * scale;
+      
+      const x = (150 - drawWidth / 2) + posX;
+      const y = (150 - drawHeight / 2) + posY;
+
+      ctx.save();
+      ctx.filter = "blur(8px) brightness(0.65)";
+      ctx.drawImage(img, x, y, drawWidth, drawHeight);
+      ctx.restore();
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(150, 150, 100, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.fillStyle = "#fafafa";
+      ctx.fillRect(50, 50, 200, 200);
+      ctx.filter = "none";
+      ctx.drawImage(img, x, y, drawWidth, drawHeight);
+      ctx.restore();
+
+      ctx.beginPath();
+      ctx.arc(150, 150, 100, 0, Math.PI * 2);
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    };
+  }
+
+  function handleMouseDown(e) {
+    if (!isCropModalOpen) return;
+    isDragging = true;
+    startX = e.clientX - posX;
+    startY = e.clientY - posY;
+  }
+
+  function handleMouseMove(e) {
+    if (!isDragging) return;
+    posX = e.clientX - startX;
+    posY = e.clientY - startY;
+    drawCanvas();
+  }
+
+  function handleMouseUp() {
+    isDragging = false;
+  }
+
+  function handleTouchStart(e) {
+    if (!isCropModalOpen || e.touches.length === 0) return;
+    isDragging = true;
+    startX = e.touches[0].clientX - posX;
+    startY = e.touches[0].clientY - posY;
+  }
+
+  function handleTouchMove(e) {
+    if (!isDragging || e.touches.length === 0) return;
+    e.preventDefault();
+    posX = e.touches[0].clientX - startX;
+    posY = e.touches[0].clientY - startY;
+    drawCanvas();
+  }
+
+  function handleTouchEnd() {
+    isDragging = false;
+  }
+
+  function handleZoom(e) {
+    scale = Number(e.target.value);
+    drawCanvas();
+  }
+
+  async function uploadPfp() {
+    if (!canvasEl || !imageSrc) return;
+    
+    isUploadingPfp = true;
+    
+    try {
+      const outputCanvas = document.createElement("canvas");
+      outputCanvas.width = 200;
+      outputCanvas.height = 200;
+      const oCtx = outputCanvas.getContext("2d");
+      oCtx.fillStyle = "#ffffff";
+      oCtx.fillRect(0, 0, 200, 200);
+
+      const img = new Image();
+      img.src = imageSrc;
+      
+      await new Promise((resolve) => {
+        img.onload = () => {
+          oCtx.save();
+          oCtx.beginPath();
+          oCtx.arc(100, 100, 100, 0, Math.PI * 2);
+          oCtx.clip();
+
+          const baseSize = Math.min(img.width, img.height);
+          const initScale = 200 / baseSize;
+          const drawWidth = img.width * initScale * scale;
+          const drawHeight = img.height * initScale * scale;
+          const x = (100 - drawWidth / 2) + posX;
+          const y = (100 - drawHeight / 2) + posY;
+
+          oCtx.drawImage(img, x, y, drawWidth, drawHeight);
+          oCtx.restore();
+          resolve();
+        };
+      });
+
+      const blob = await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/jpeg', 0.9));
+      
+      const formData = new FormData();
+      formData.append('avatar', blob, 'pfp.jpg');
+
+      Swal.fire({
+        title: 'Mengupload foto...',
+        text: 'Mohon tunggu sebentar',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      const response = await fetch("/api/users/upload/pfp", {
+        method: "PATCH",
+        body: formData,
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+
+      Swal.close();
+
+      if (response.status === 200) {
+        const pfpFilename = result.data?.pfp;
+        
+        if (pfpFilename) {
+          localStorage.setItem("user_avatar", pfpFilename);
+          const timestamp = Date.now();
+          userPfp = `/avatar/${pfpFilename}?t=${timestamp}`;
+          userPfp = userPfp;
+        }
+        
+        isCropModalOpen = false;
+
+        Swal.fire({
+          icon: "success",
+          title: "Berhasil!",
+          text: "Foto profil Anda berhasil diganti.",
+          confirmButtonColor: "#0a2e52",
+          timer: 1500,
+          showConfirmButton: false
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Gagal!",
+          text: result.message || "Gagal mengupload foto profil.",
+          confirmButtonColor: "#ef4444"
+        });
+      }
+    } catch (error) {
+      console.error("Error uploading pfp:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error!",
+        text: "Terjadi kesalahan saat mengupload foto.",
+        confirmButtonColor: "#ef4444"
+      });
+    } finally {
+      isUploadingPfp = false;
+    }
+  }
+  // ============ END PFP ============
+
   function saveOtpState() {
     if (isOtpModalOpen) {
       sessionStorage.setItem("otp_modal_state_admin", JSON.stringify({
@@ -942,6 +1206,9 @@
       profile.game_id = localStorage.getItem("user_game_id") || "";
       profile.server_id = localStorage.getItem("user_server_id") || "";
       
+      // Ambil PFP dari localStorage
+      userPfp = getPfp();
+      
       // Simpan data profil awal
       initialProfile = {
         nama: profile.nama,
@@ -1024,13 +1291,26 @@
         sessionStorage.removeItem("otp_modal_state_admin");
       }
     }
+
+    // Refresh PFP saat tab aktif kembali
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshPfp();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   });
 
   function handleLogout() {
     Swal.fire({
       title: "Yakin ingin keluar?", icon: "warning", showCancelButton: true,
       confirmButtonColor: "#ef4444", cancelButtonColor: "#9ca3af", confirmButtonText: "Ya, Logout!",
-    }).then((r) => { if (r.isConfirmed) {   localStorage.clear()  ;push("/"); } });
+    }).then((r) => { if (r.isConfirmed) { localStorage.clear(); push("/"); } });
   }
 
   let innerWidth = 0;
@@ -1102,9 +1382,13 @@
       </div>
       <div class="relative">
         <button on:click={toggleDropdown} class="flex items-center gap-2 px-2 py-1 transition-colors rounded-md cursor-pointer md:gap-3 hover:bg-gray-50 focus:outline-none">
-          <div class="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center">
-            <span class="text-lg font-bold text-black">{currentUserName.charAt(0).toUpperCase()}</span>
-          </div>
+          {#if userPfp}
+            <img src={userPfp} alt="Profile" class="w-11 h-11 rounded-full object-cover border border-gray-200 shadow-sm" />
+          {:else}
+            <div class="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center">
+              <span class="text-lg font-bold text-black">{currentUserName.charAt(0).toUpperCase()}</span>
+            </div>
+          {/if}
           <span class="text-sm font-bold text-gray-700">{currentUserName}</span>
           <svg class="w-4 h-4 text-gray-400 transition-transform duration-200 {isDropdownOpen ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
         </button>
@@ -1132,17 +1416,33 @@
           <p class="mt-1 text-sm text-gray-500">Kelola akun dan preferensi Anda</p>
         </div>
 
-        <!-- Profile Card Top -->
+        <!-- Profile Card Top dengan PFP -->
         <div class="relative p-6 overflow-hidden text-white shadow-lg sm:p-8 bg-gradient-to-r from-[#0a4682] to-[#126bc2] rounded-2xl">
           <div class="relative z-10 flex flex-col items-center gap-4 sm:flex-row sm:items-center">
-            <div class="flex items-center justify-center w-20 h-20 text-3xl font-black rounded-full bg-white/20 border-2 border-white/40 shrink-0">
-              {currentUserName.charAt(0).toUpperCase()}
+            
+            <div class="relative group cursor-pointer shrink-0" on:click={triggerFileInput} title="Tekan untuk mengubah foto profil">
+              {#if userPfp}
+                <img src={userPfp} alt="Profile" class="w-20 h-20 rounded-full border-2 border-white/40 object-cover shadow-md" />
+              {:else}
+                <div class="flex items-center justify-center w-20 h-20 text-3xl font-black rounded-full bg-white/20 border-2 border-white/40">
+                  {currentUserName.charAt(0).toUpperCase()}
+                </div>
+              {/if}
+              <!-- Hover Overlay trigger -->
+              <div class="absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
             </div>
+            
             <div class="text-center sm:text-left">
               <h3 class="text-xl font-bold sm:text-2xl">{currentUserName}</h3>
               <p class="text-sm text-blue-200">{profile.role} • E-Sport PGRI</p>
               <p class="mt-1 text-xs text-blue-300">{profile.email}</p>
             </div>
+            
           </div>
           <div class="absolute w-64 h-64 bg-white rounded-full opacity-5 -right-10 -top-20 blur-2xl pointer-events-none"></div>
         </div>
@@ -1160,7 +1460,7 @@
           {/each}
         </div>
 
-        <!-- Tab Content: Profile - SAMA PERSIS DENGAN USER + Game ID & Server ID -->
+        <!-- Tab Content: Profile -->
         {#if activeTab === "profile"}
           <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
@@ -1193,7 +1493,6 @@
                   class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]" />
               </div>
               
-              <!-- Tambahan Game ID & Server ID seperti di user -->
               <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
                   <label for="game_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Game ID</label>
@@ -1223,7 +1522,7 @@
             </div>
           </div>
 
-        <!-- Tab Content: Password - SAMA PERSIS DENGAN USER -->
+        <!-- Tab Content: Password -->
         {:else if activeTab === "password"}
           <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
@@ -1267,7 +1566,7 @@
             </div>
           </div>
 
-        <!-- Tab Content: Website - TETAP SAMA -->
+        <!-- Tab Content: Website -->
         {:else if activeTab === "website"}
           <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
             <div class="px-5 py-4 border-b border-gray-100 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1276,7 +1575,6 @@
                 <p class="text-sm text-gray-500">Kelola aset gambar dan deskripsi website utama</p>
               </div>
               
-              <!-- Sub Tabs inside Website Settings -->
               <div class="flex bg-gray-100 p-1 rounded-lg self-start sm:self-center">
                 <button 
                   on:click={() => subTab = "hero"} 
@@ -1300,7 +1598,6 @@
             </div>
             
             <div class="p-5 sm:p-6">
-              
               {#if subTab === "hero"}
                 <!-- HERO SECTION -->
                 <div class="space-y-6">
@@ -1585,7 +1882,6 @@
     </div>
 
     <div class="p-6 space-y-6">
-      <!-- OTP Input -->
       <div class="flex justify-center gap-3">
         {#each otpCodes as code, i}
           <input
@@ -1598,15 +1894,12 @@
             on:keydown={(e) => handleOtpKeydown(i, e)}
             on:paste={handleOtpPaste}
             disabled={isLoadingOtp}
-            class="w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl
-                   focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682] outline-none transition-all
-                   bg-white text-gray-800 shadow-sm disabled:opacity-50"
+            class="w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682] outline-none transition-all bg-white text-gray-800 shadow-sm disabled:opacity-50"
             autocomplete="off"
           />
         {/each}
       </div>
 
-      <!-- Resend OTP -->
       <div class="text-center">
         <p class="text-sm text-gray-500">
           Tidak menerima kode?
@@ -1624,7 +1917,6 @@
         </p>
       </div>
 
-      <!-- Action Buttons -->
       <div class="flex gap-3 pt-4">
         <button 
           on:click={resetOtpModal} 
@@ -1651,6 +1943,79 @@
 
   </div>
 </div>
+{/if}
+
+<!-- Hidden PFP file input -->
+<input type="file" id="pfp-input" accept="image/*" class="hidden" on:change={handleFileSelect} />
+
+<!-- Modal Cropper (Framing Bulat) -->
+{#if isCropModalOpen}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl border border-gray-100 flex flex-col">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-extrabold text-gray-800 text-lg">Sesuaikan Foto Profil</h3>
+        <button on:click={() => isCropModalOpen = false} class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-6 flex flex-col items-center justify-center bg-gray-50 border-b border-gray-100">
+        <p class="text-xs text-gray-500 mb-4 text-center">Geser foto dengan mouse/jari</p>
+        
+        <div 
+          class="relative w-[300px] h-[300px] bg-gray-100 rounded-xl overflow-hidden shadow-inner border border-gray-200 cursor-move select-none"
+          on:mousedown={handleMouseDown}
+          on:mousemove={handleMouseMove}
+          on:mouseup={handleMouseUp}
+          on:mouseleave={handleMouseUp}
+          on:touchstart={handleTouchStart}
+          on:touchmove={handleTouchMove}
+          on:touchend={handleTouchEnd}
+        >
+          <canvas bind:this={canvasEl} width="300" height="300" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+        </div>
+
+        <div class="w-full mt-6 space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold text-gray-600">
+            <span>Perkecil</span>
+            <span>Perbesar</span>
+          </div>
+          <input 
+            type="range" 
+            min="0.5" 
+            max="3" 
+            step="0.05" 
+            value={scale} 
+            on:input={handleZoom} 
+            class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0a2e52]" 
+          />
+        </div>
+      </div>
+
+      <div class="px-5 py-4 bg-gray-50 flex items-center justify-end gap-3">
+        <button 
+          on:click={() => isCropModalOpen = false} 
+          class="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          Batal
+        </button>
+        <button 
+          on:click={uploadPfp} 
+          disabled={isUploadingPfp}
+          class="px-5 py-2 text-sm font-bold text-white bg-[#0a2e52] hover:bg-[#0c5599] rounded-lg shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {#if isUploadingPfp}
+            <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            Mengupload...
+          {:else}
+            Simpan Foto
+          {/if}
+        </button>
+      </div>
+    </div>
+  </div>
 {/if}
 
 <style>

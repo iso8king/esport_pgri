@@ -49,6 +49,7 @@
     localStorage.setItem("status" , data.data.status);
     localStorage.setItem("tim" , data.data.tim)
     localStorage.setItem("akun_dibuat" , data.data.akun_dibuat)
+    localStorage.setItem("user_avatar", data.data.avatar);
 
     Swal.fire({
       icon: 'success',

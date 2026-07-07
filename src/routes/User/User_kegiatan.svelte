@@ -5,7 +5,7 @@
   import {fetchWithAuth} from "$lib/auth.js"
 
   let currentUserName = "Loading...";
-  let userAvatar = "";
+  let userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
   let kegiatanList = [];
   let isLoading = true;
   
@@ -232,7 +232,8 @@
             pelajaran: sudahAbsen ? (absenData.deskripsi || null) : null,
             mood: sudahAbsen ? (absenData.mood || null) : null,
             bukti_url: sudahAbsen ? (absenData.bukti_url || null) : null,
-            createdAt: sudahAbsen ? absenData.createdAt : null
+            createdAt: sudahAbsen ? absenData.createdAt : null,
+            attachment: kegiatan.attachment || null // Tambahkan ini
           };
         });
       } else {
@@ -409,6 +410,22 @@
     uploadedFileSize = "";
     const fileInput = document.getElementById('fileInput');
     if (fileInput) fileInput.value = '';
+  }
+
+  // Fungsi untuk membuka attachment
+  function openAttachment(attachment) {
+    if (!attachment) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Tidak Ada Lampiran',
+        text: 'Kegiatan ini tidak memiliki lampiran.',
+        confirmButtonColor: '#0b5ba2'
+      });
+      return;
+    }
+    
+    // Buka di tab baru
+    window.open(`/attachment/${attachment}`, '_blank');
   }
 
   async function submitAbsen() {
@@ -710,6 +727,20 @@
                     </div>
                   </div>
                 </div>
+                
+                <!-- START: Tambahan Button Attachment -->
+                {#if kegiatan.attachment}
+                  <button 
+                    on:click={() => openAttachment(kegiatan.attachment)}
+                    class="flex items-center justify-center gap-2 w-full py-2.5 text-sm font-bold transition-all duration-200 rounded-xl cursor-pointer bg-blue-600 text-white shadow-md hover:bg-blue-700"
+                  >
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                    Lihat Lampiran
+                  </button>
+                {/if}
+                <!-- END: Tambahan Button Attachment -->
                 
                 {#if kegiatan.sudahAbsen}
                   <button 

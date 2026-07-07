@@ -10,16 +10,19 @@
   let teamOptions = ["Team A", "Team B", "Team C"];
   let tipeOptions = ["Tournament", "Scrim"];
 
+  let userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+
   $: statistik = {
     jadwalTournament: jadwalList.filter(j => j.tipe === "Tournament").length,
     jadwalScrim: jadwalList.filter(j => j.tipe === "Scrim").length,
-    jumlahTeam: 0, // Temporary karena team sudah dihapus
+    jumlahTeam: 0,
   };
 
   // Modal state
   let isModalOpen = false;
   let isEditing = false;
   let editId = null;
+  let selectedFile = null;
   let formData = {
     namaAcara: '',
     tanggalAcara: '',
@@ -27,11 +30,16 @@
     hanyaUntukTim: false
   };
 
-  function openModal() { isModalOpen = true; }
+  function openModal() { 
+    isModalOpen = true; 
+    selectedFile = null;
+  }
+  
   function closeModal() {
     isModalOpen = false;
     isEditing = false;
     editId = null;
+    selectedFile = null;
     formData = {
       namaAcara: '',
       tanggalAcara: '',
@@ -41,66 +49,65 @@
   }
 
   // Fungsi untuk mengambil data jadwal dari backend
-async function fetchJadwalData() {
-  isLoading = true;
-  try {
-    const response = await fetchWithAuth('/api/kegiatan/', {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json'
+  async function fetchJadwalData() {
+    isLoading = true;
+    try {
+      const response = await fetchWithAuth('/api/kegiatan/', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Response dari backend:', result);
+        
+        const kegiatanData = result.data?.data || [];
+        
+        jadwalList = kegiatanData.map(item => ({
+          id: item.id,
+          event: item.nama_kegiatan,
+          waktu: formatDate(item.tanggal_kegiatan),
+          lokasi: item.jam,
+          teamOnly: item.onlyTeam ? "Ya" : "Tidak",
+          status: getStatus(item.tanggal_kegiatan),
+          tipe: item.onlyTeam ? "Team Only" : "Public",
+          team: "-",
+          tanggalOriginal: item.tanggal_kegiatan,
+          attachment: item.attachment || null
+        }));
+        
+        console.log('JadwalList setelah transformasi:', jadwalList);
+      } else {
+        console.error('Gagal fetch data:', response.status);
+        jadwalList = [];
       }
-    });
-    
-    if (response.ok) {
-      const result = await response.json();
-      console.log('Response dari backend:', result);
-      
-      // Mengambil data dari struktur response: result.data.data
-      const kegiatanData = result.data?.data || [];
-      
-      // Transformasi data dari backend ke format yang digunakan di frontend
-      jadwalList = kegiatanData.map(item => ({
-        id: item.id,
-        event: item.nama_kegiatan,
-        waktu: formatDate(item.tanggal_kegiatan), // ← pakai format baru
-        lokasi: item.jam,
-        teamOnly: item.onlyTeam ? "Ya" : "Tidak",
-        status: getStatus(item.tanggal_kegiatan),
-        tipe: item.onlyTeam ? "Team Only" : "Public",
-        team: "-",
-        tanggalOriginal: item.tanggal_kegiatan
-      }));
-      
-      console.log('JadwalList setelah transformasi:', jadwalList);
-    } else {
-      console.error('Gagal fetch data:', response.status);
+    } catch (error) {
+      console.error('Error fetching data:', error);
       jadwalList = [];
+    } finally {
+      isLoading = false;
     }
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    jadwalList = [];
-  } finally {
-    isLoading = false;
   }
-}
 
-function formatDate(dateString) {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  
-  const months = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-  ];
-  
-  const day = date.getDate();
-  const month = months[date.getMonth()];
-  const year = date.getFullYear();
-  
-  return `${day} ${month} ${year}`;
-}
-  // Fungsi untuk menentukan status berdasarkan tanggal
+  function formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    
+    return `${day} ${month} ${year}`;
+  }
+
   function getStatus(dateString) {
     if (!dateString) return "Upcoming";
     const today = new Date();
@@ -119,8 +126,50 @@ function formatDate(dateString) {
     }
   }
 
+  // Handle file selection
+  function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+      const allowedTypes = ['image/png', 'image/jpg', 'image/jpeg', 'application/pdf', 
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+        'application/msword'];
+      
+      if (!allowedTypes.includes(file.type)) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Tipe File Tidak Didukung',
+          text: 'Hanya file PNG, JPG, JPEG, PDF, dan DOCX yang diperbolehkan!',
+          confirmButtonColor: '#0a4682'
+        });
+        event.target.value = '';
+        selectedFile = null;
+        return;
+      }
+      
+      if (file.size > 5 * 1024 * 1024) { // 5MB
+        Swal.fire({
+          icon: 'warning',
+          title: 'Ukuran File Terlalu Besar',
+          text: 'Ukuran file maksimal 5MB!',
+          confirmButtonColor: '#0a4682'
+        });
+        event.target.value = '';
+        selectedFile = null;
+        return;
+      }
+      
+      selectedFile = file;
+    }
+  }
+
+  // Remove selected file
+  function removeFile() {
+    selectedFile = null;
+    const fileInput = document.getElementById('attachment');
+    if (fileInput) fileInput.value = '';
+  }
+
   async function handleSubmit() {
-    // Validasi field yang wajib diisi
     if (!formData.namaAcara || !formData.tanggalAcara || !formData.lokasi) {
       Swal.fire({ 
         icon: "warning", 
@@ -131,16 +180,9 @@ function formatDate(dateString) {
       return;
     }
 
-    const payload = {
-      nama_kegiatan: formData.namaAcara,
-      tanggal_kegiatan: formData.tanggalAcara,
-      jam: formData.lokasi,
-      onlyTeam: formData.hanyaUntukTim || false
-    };
-
     try {
       Swal.fire({
-        title: "Menyimpan data...",
+        title: isEditing ? "Mengubah data..." : "Menyimpan data...",
         text: "Mohon tunggu sebentar",
         allowOutsideClick: false,
         didOpen: () => {
@@ -151,13 +193,21 @@ function formatDate(dateString) {
       const url = isEditing ? `/api/kegiatan/${editId}/update` : `/api/kegiatan/create`;
       const method = isEditing ? 'PATCH' : 'POST';
 
-      const response = await fetchWithAuth(url, {
+      // Gunakan FormData untuk mengirim file
+      const formDataToSend = new FormData();
+      formDataToSend.append('nama_kegiatan', formData.namaAcara);
+      formDataToSend.append('tanggal_kegiatan', formData.tanggalAcara);
+      formDataToSend.append('jam', formData.lokasi);
+      formDataToSend.append('onlyTeam', formData.hanyaUntukTim ? 'true' : 'false');
+      
+      if (selectedFile) {
+        formDataToSend.append('attachment', selectedFile);
+      }
+
+      const response = await fetch(url, {
         method: method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
         credentials: 'include',
-        body: JSON.stringify(payload)
+        body: formDataToSend 
       });
 
       const result = await response.json();
@@ -180,8 +230,6 @@ function formatDate(dateString) {
       });
       
       closeModal();
-      
-      // Refresh data dari backend setelah submit
       await fetchJadwalData();
       
     } catch (error) {
@@ -198,6 +246,7 @@ function formatDate(dateString) {
   function openEditModal(jadwal) {
     isEditing = true;
     editId = jadwal.id;
+    selectedFile = null;
     
     let formattedDate = "";
     if (jadwal.tanggalOriginal) {
@@ -218,7 +267,6 @@ function formatDate(dateString) {
   }
 
   async function deleteJadwal(id) {
-    // Cari jadwal berdasarkan id untuk mengecek statusnya
     const jadwal = jadwalList.find(j => j.id === id);
     if (!jadwal) return;
 
@@ -322,7 +370,6 @@ function formatDate(dateString) {
       return;
     }
     
-    // Ambil data jadwal saat halaman dimuat
     fetchJadwalData();
   });
 
@@ -486,23 +533,16 @@ function formatDate(dateString) {
       </div>
 
       <div class="relative">
-        <button
-          on:click={toggleDropdown}
-          class="flex items-center gap-2 px-2 py-1 transition-colors rounded-md cursor-pointer md:gap-3 hover:bg-gray-50 focus:outline-none"
-        >
-          <div class="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center">
-            <span class="text-lg font-bold text-black">{currentUserName.charAt(0).toUpperCase()}</span>
-          </div>
+         <button on:click={toggleDropdown} class="flex items-center gap-2 px-2 py-1 transition-colors rounded-md cursor-pointer md:gap-3 hover:bg-gray-50 focus:outline-none">
+          {#if userAvatar}
+            <img src={userAvatar} alt="Profile" class="w-11 h-11 rounded-full object-cover border border-gray-200 shadow-sm" />
+          {:else}
+            <div class="w-11 h-11 rounded-full bg-gray-400 flex items-center justify-center">
+              <span class="text-lg font-bold text-black">{currentUserName.charAt(0).toUpperCase()}</span>
+            </div>
+          {/if}
           <span class="text-sm font-bold text-gray-700">{currentUserName}</span>
-          <svg
-            class="w-4 h-4 text-gray-400 transition-transform duration-200 {isDropdownOpen ? 'rotate-180' : ''}"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
+          <svg class="w-4 h-4 text-gray-400 transition-transform duration-200 {isDropdownOpen ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
         </button>
 
         {#if isDropdownOpen}
@@ -546,7 +586,7 @@ function formatDate(dateString) {
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6">
           <div class="flex flex-col justify-center p-5 bg-white border border-gray-100 shadow-sm sm:p-6 rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
-              <svg class="w-6 h-6"  viewBox="0 0 2048 2048">
+              <svg class="w-6 h-6" viewBox="0 0 2048 2048">
                 <path fill="#46a46a" d="M1792 993q60 41 107 93t81 114t50 131t18 141q0 119-45 224t-124 183t-183 123t-224 46q-91 0-176-27t-156-78t-126-122t-85-157H128V128h256V0h128v128h896V0h128v128h256v865zM256 256v256h1408V256h-128v128h-128V256H512v128H384V256H256zm643 1280q-3-31-3-64q0-86 24-167t73-153h-97v-128h128v86q41-51 91-90t108-67t121-42t128-15q100 0 192 33V640H256v896h643zm573 384q93 0 174-35t142-96t96-142t36-175q0-93-35-174t-96-142t-142-96t-175-36q-93 0-174 35t-142 96t-96 142t-36 175q0 93 35 174t96 142t142 96t175 36zm64-512h192v128h-320v-384h128v256zM384 1024h128v128H384v-128zm256 0h128v128H640v-128zm0-256h128v128H640V768zm0 512h128v128H640v-128zm384-384H896V768h128v128zm256 0h-128V768h128v128zM384 768h128v128H384V768z"/>
               </svg>
             </div>
@@ -556,7 +596,7 @@ function formatDate(dateString) {
 
           <div class="flex flex-col justify-center p-5 bg-white border border-gray-100 shadow-sm sm:p-6 rounded-2xl">
             <div class="flex items-center justify-center w-12 h-12 mb-4 text-green-700 bg-green-100 rounded-xl">
-              <svg class="w-6 h-6"  viewBox="0 0 2048 2048">
+              <svg class="w-6 h-6" viewBox="0 0 2048 2048">
                 <path fill="#46a46a" d="M1792 993q60 41 107 93t81 114t50 131t18 141q0 119-45 224t-124 183t-183 123t-224 46q-91 0-176-27t-156-78t-126-122t-85-157H128V128h256V0h128v128h896V0h128v128h256v865zM256 256v256h1408V256h-128v128h-128V256H512v128H384V256H256zm643 1280q-3-31-3-64q0-86 24-167t73-153h-97v-128h128v86q41-51 91-90t108-67t121-42t128-15q100 0 192 33V640H256v896h643zm573 384q93 0 174-35t142-96t96-142t36-175q0-93-35-174t-96-142t-142-96t-175-36q-93 0-174 35t-142 96t-96 142t-36 175q0 93 35 174t96 142t142 96t175 36zm64-512h192v128h-320v-384h128v256zM384 1024h128v128H384v-128zm256 0h128v128H640v-128zm0-256h128v128H640V768zm0 512h128v128H640v-128zm384-384H896V768h128v128zm256 0h-128V768h128v128zM384 768h128v128H384V768z"/>
               </svg>
             </div>
@@ -579,14 +619,14 @@ function formatDate(dateString) {
           <div class="px-4 py-5 flex items-center justify-between border-b border-gray-100 sm:px-6">
             <h3 class="text-lg font-bold text-gray-800">Jadwal</h3>
             <button
-            on:click={openModal}
-            class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] hover:shadow-lg active:scale-95"
-          >
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Buat Jadwal
-          </button>
+              on:click={openModal}
+              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] hover:shadow-lg active:scale-95"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Buat Jadwal
+            </button>
           </div>
 
           {#if isLoading}
@@ -652,7 +692,6 @@ function formatDate(dateString) {
             <div class="block space-y-4 sm:hidden p-4">
               {#each jadwalList as jadwal}
                 <div class="p-5 border border-gray-150 rounded-2xl bg-white shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                  <!-- Decorative border-l for status colors -->
                   <div class="absolute left-0 top-0 bottom-0 w-1.5 {jadwal.status === 'Selesai' ? 'bg-gray-400' : jadwal.status === 'Hari Ini' ? 'bg-green-500' : 'bg-blue-500'}"></div>
                   
                   <div class="pl-2">
@@ -771,6 +810,38 @@ function formatDate(dateString) {
               class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
               placeholder="Masukkan Jam"
             />
+          </div>
+
+          <div>
+            <label for="attachment" class="block mb-1.5 text-sm font-semibold text-gray-700">Attachment (Opsional)</label>
+            <div class="flex items-center gap-3">
+              <input
+                id="attachment"
+                type="file"
+                accept=".png,.jpg,.jpeg,.pdf,.docx"
+                on:change={handleFileSelect}
+                class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#0a4682] file:text-white hover:file:bg-[#0c5599] cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+              />
+              {#if selectedFile}
+                <button
+                  on:click={removeFile}
+                  class="p-2 text-red-600 transition-colors rounded-lg hover:bg-red-50"
+                  title="Hapus file"
+                >
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              {/if}
+            </div>
+            {#if selectedFile}
+              <p class="mt-1 text-xs text-green-600">
+                <span class="font-semibold">File terpilih:</span> {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
+              </p>
+            {/if}
+            <p class="mt-1 text-xs text-gray-400">
+              Format yang didukung: PNG, JPG, JPEG, PDF, DOCX (Maks. 5MB)
+            </p>
           </div>
 
           <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">

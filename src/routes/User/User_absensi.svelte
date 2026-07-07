@@ -5,7 +5,7 @@
   import {fetchWithAuth} from "$lib/auth.js"
   
   let currentUserName = "Loading...";
-  let userAvatar = "";
+  let userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
   let activeTab = "tersedia";
   let isLoading = true;
 
