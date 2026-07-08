@@ -10,7 +10,13 @@
   let teamOptions = ["Team A", "Team B", "Team C"];
   let tipeOptions = ["Tournament", "Scrim"];
 
-  let userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+  let userAvatar = '';
+  const avatar = localStorage.getItem("user_avatar");
+
+  if(avatar !== 'null'){
+      userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+  }
+  
 
   $: statistik = {
     jadwalTournament: jadwalList.filter(j => j.tipe === "Tournament").length,

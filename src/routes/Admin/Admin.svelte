@@ -8,7 +8,13 @@
   let anggotaList = [];
   let isLoading = true;
   let errorMessage = "";
-  let userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+  let userAvatar = '';
+  const avatar = localStorage.getItem("user_avatar");
+
+  if(avatar !== 'null'){
+      userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+  }
+  
   
   // Statistik dari backend
   let statistikData = {

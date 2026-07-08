@@ -10,7 +10,13 @@
   let errorMessage = ""; 
   let teamList = [];
 
-  let userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+  let userAvatar = '';
+  const avatar = localStorage.getItem("user_avatar");
+
+  if(avatar !== 'null'){
+      userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+  }
+  
   
   // API URL
   const API_URL = "/api/users/all";

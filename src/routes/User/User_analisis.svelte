@@ -5,8 +5,14 @@
   import AnalisisDashboard from "../../lib/AnalisisDashboard.svelte";
 
   let currentUserName = "Loading...";
-  let userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
   let isLoading = true;
+  let userAvatar = '';
+  const avatar = localStorage.getItem("user_avatar");
+
+  if(avatar !== 'null'){
+      userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+  }
+  
 
   onMount(() => {
     const name = localStorage.getItem("user_name");

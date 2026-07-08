@@ -5,7 +5,13 @@
   import {fetchWithAuth} from "$lib/auth.js"
 
   let currentUserName = "Loading...";
-  let userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+  let userAvatar = '';
+  const avatar = localStorage.getItem("user_avatar");
+
+  if(avatar !== 'null'){
+      userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+  }
+  
 
   // State untuk data dari backend
   let jadwalAbsen = [];

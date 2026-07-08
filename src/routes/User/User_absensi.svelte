@@ -5,9 +5,15 @@
   import {fetchWithAuth} from "$lib/auth.js"
   
   let currentUserName = "Loading...";
-  let userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
   let activeTab = "tersedia";
   let isLoading = true;
+  let userAvatar = '';
+  const avatar = localStorage.getItem("user_avatar");
+
+  if(avatar !== 'null'){
+      userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+  }
+  
 
   // State untuk menyimpan data kegiatan dan absen
   let semuaKegiatan = []; // Semua kegiatan dari backend

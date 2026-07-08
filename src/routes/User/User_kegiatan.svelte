@@ -5,9 +5,14 @@
   import {fetchWithAuth} from "$lib/auth.js"
 
   let currentUserName = "Loading...";
-  let userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
   let kegiatanList = [];
   let isLoading = true;
+  let userAvatar = '';
+  const avatar = localStorage.getItem("user_avatar");
+
+  if(avatar !== 'null'){
+      userAvatar = `/avatar/${localStorage.getItem("user_avatar")}`;
+  }
   
   // Pagination state
   let currentPage = 1;
