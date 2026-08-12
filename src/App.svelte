@@ -7,6 +7,7 @@
     import Admin_absensi from './routes/Admin/Admin_absensi.svelte';
     import Admin_analisis from './routes/Admin/Admin_analisis.svelte';
     import Admin_jadwal from './routes/Admin/Admin_jadwal.svelte';
+    import Admin_berita from './routes/Admin/Admin_berita.svelte';
     import Admin_Setting from './routes/Admin/Admin_Setting.svelte';
     import SignIn from './routes/SignIn.svelte';
     import SignUp from './routes/SignUp.svelte';
@@ -44,6 +45,7 @@
         '/admin/absensi': Admin_absensi,
         '/admin/analisis': Admin_analisis,
         '/admin/jadwal': Admin_jadwal,
+        '/admin/berita': Admin_berita,
         '/admin/settings': Admin_Setting,
 
 
