@@ -67,12 +67,14 @@
             totalHadir: 0,
             statusTanggal: getStatusTanggal(item.tanggal_kegiatan),
             status: getStatusTanggal(item.tanggal_kegiatan),
-            isDisabled: false
+            isDisabled: false,
+            jamMulai : item.jam_mulai,
+            jamSelesai : item.jam_selesai
           };
         });
         
         // Urutkan berdasarkan tanggal (yang terdekat dulu)
-        jadwalAbsen.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+        jadwalAbsen.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
         
         console.log('JadwalAbsen setelah transformasi:', jadwalAbsen);
       } else {
@@ -429,7 +431,7 @@
     <div class="flex items-center justify-between px-6 py-8">
       <div class="flex items-center gap-3">
         <img src="src/assets/logo1.png" alt="logo" class="w-10 h-12 text-white" />
-        <span class="text-2xl font-bold tracking-wider">E-Sport</span>
+        <span class="text-xl md:text-2xl font-bold tracking-wider">smegione</span>
       </div>
 
       <button
@@ -494,6 +496,15 @@
             class="flex items-center w-full gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg text-gray-300 hover:bg-white/5 hover:text-white"
           >
             Jadwal
+          </button>
+
+          <button
+            on:click={() => {
+              window.location.href = "#/admin/berita";
+            }}
+            class="flex items-center w-full gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg text-gray-300 hover:bg-white/5 hover:text-white"
+          >
+            Berita
           </button>
         </div>
       </div>
@@ -631,7 +642,7 @@
                         <h4 class="text-lg font-extrabold text-gray-800">{jadwal.judul}</h4>
                         <div class="pl-6 space-y-1.5 text-sm font-medium text-gray-600">
                           <p>• {jadwal.tanggalFormatted}</p>
-                          <p>• {jadwal.waktu}</p>
+                          <p>• {jadwal.jamMulai} - {jadwal.jamSelesai}</p>
                         </div>
                       </div>
                     </div>
@@ -665,7 +676,7 @@
             <div>
               <h2 class="text-2xl font-black text-gray-800">{selectedJadwal.judul}</h2>
               <p class="mt-2 text-sm font-medium text-gray-500">
-                {selectedJadwal.tanggalFormatted} • {selectedJadwal.waktu}
+                {selectedJadwal.tanggalFormatted} • {selectedJadwal.jamMulai} - {selectedJadwal.jamSelesai}
               </p>
             </div>
 
@@ -735,7 +746,7 @@
       <div class="p-8 md:p-10 space-y-8 overflow-y-auto max-h-[90vh]">
         <div>
           <h2 class="text-lg font-extrabold text-gray-800 pr-10">{selectedJadwal.judul}</h2>
-          <p class="mt-1 text-xs font-medium text-gray-500">{selectedJadwal.tanggalFormatted} • {selectedJadwal.waktu}</p>
+          <p class="mt-1 text-xs font-medium text-gray-500">{selectedJadwal.tanggalFormatted} • {selectedJadwal.jamMulai} - {selectedJadwal.jamSelesai}</p>
           <p class="mt-1 text-sm font-semibold text-[#0a2e52]">{selectedSiswaDetail.nama}</p>
         </div>
 

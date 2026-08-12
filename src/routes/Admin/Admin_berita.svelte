@@ -328,7 +328,7 @@
           alt="logo"
           class="w-10 h-12 text-white"
         />
-        <span class="text-2xl font-bold tracking-wider">E-Sport</span>
+        <span class="text-xl md:text-2xl font-bold tracking-wider">smegione</span>
       </div>
 
       <button
