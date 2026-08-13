@@ -253,7 +253,7 @@
     <div class="flex items-center justify-between px-6 py-8">
       <div class="flex items-center gap-3">
         <img src="src/assets/logo1.png" alt="logo" class="w-10 h-12 text-white" />
-        <span class="text-2xl font-bold tracking-wider">E-Sport</span>
+        <span class="text-xl md:text-2xl font-bold tracking-wider">smegione</span>
       </div>
 
       <button
@@ -319,6 +319,15 @@
           >
             Jadwal
           </button>
+
+          <button
+            on:click={() => {
+              window.location.href = "#/admin/berita";
+            }}
+            class="flex items-center w-full gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg text-gray-300 hover:bg-white/5 hover:text-white"
+          >
+            Berita
+          </button>
         </div>
       </div>
       
@@ -329,6 +338,7 @@
         >
           Logout
         </button>
+        
       </div>
     </nav>
   </aside>

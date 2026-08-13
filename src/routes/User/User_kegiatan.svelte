@@ -626,7 +626,7 @@
     <div class="flex items-center justify-between px-6 py-8">
       <div class="flex items-center gap-3">
         <img src="src/assets/logo1.png" alt="logo" class="w-10 h-12 text-white" />
-        <span class="text-2xl font-bold tracking-wider">E-Sport</span>
+        <span class="text-xl md:text-2xl font-bold tracking-wider">smegione</span>
       </div>
       <button on:click={toggleSidebar} class="p-1 transition-colors rounded-md cursor-pointer md:hidden bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
