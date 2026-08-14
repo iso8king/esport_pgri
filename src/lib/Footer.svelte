@@ -12,7 +12,7 @@
 
       <div class="flex flex-col gap-4">
         <a href="/" class="flex items-center gap-3 text-white w-fit hover:opacity-85 transition-opacity">
-          <img src="src/assets/logo1.png" alt="logo" class="w-10 h-auto object-contain">
+          <img src="/logo1.png" alt="logo" class="w-10 h-auto object-contain">
           <span class="text-2xl font-bold tracking-wide">E-Sport PGRI</span>
         </a>
         <p class="text-blue-200 text-sm leading-relaxed max-w-sm mt-2">

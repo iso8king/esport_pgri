@@ -324,7 +324,7 @@
     <div class="flex items-center justify-between px-6 py-8">
       <div class="flex items-center gap-3">
         <img
-          src="src/assets/logo1.png"
+          src="/logo1.png"
           alt="logo"
           class="w-10 h-12 text-white"
         />
@@ -536,7 +536,7 @@
             >
               <img
                 class="w-4 h-4 text-gray-500"
-                src="src/assets/setting.svg"
+                src="/setting.svg"
                 alt="Settings Icon"
               />
               Settings

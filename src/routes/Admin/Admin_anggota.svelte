@@ -574,7 +574,7 @@
   <aside class="{isSidebarOpen ? 'w-64' : 'w-0'} {isMobile ? 'fixed left-0 top-0 z-50' : 'relative'} overflow-hidden bg-[#0a2e52] text-white flex flex-col h-full shrink-0 shadow-xl transition-all duration-300 whitespace-nowrap">
     <div class="flex items-center justify-between px-6 py-8">
       <div class="flex items-center gap-3">
-        <img src="src/assets/logo1.png" alt="logo" class="w-10 h-12 text-white" />
+        <img src="/logo1.png" alt="logo" class="w-10 h-12 text-white" />
         <span class="text-xl md:text-2xl font-bold tracking-wider">smegione</span>
       </div>
       {#if isMobile}
@@ -666,7 +666,7 @@
           <div class="fixed inset-0 z-40" on:click={closeDropdown} aria-hidden="true"></div>
           <div class="absolute right-0 z-50 w-48 py-2 mt-2 bg-white border border-gray-100 rounded-lg shadow-lg">
             <button on:click={() => { window.location.href = "#/admin/settings"; closeDropdown(); }} class="flex items-center w-full gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors text-left hover:bg-gray-50">
-              <img class="w-4 h-4 text-gray-500" src="src/assets/setting.svg" alt="Settings Icon" />
+              <img class="w-4 h-4 text-gray-500" src="/setting.svg" alt="Settings Icon" />
               Settings
             </button>
             <div class="w-full h-px my-1 bg-gray-100"></div>

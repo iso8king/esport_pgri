@@ -693,7 +693,7 @@
       return matchItemImages[cleaned];
     }
     // 3. Fallback to default asset
-    return "src/assets/logo1.png";
+    return "/logo1.png";
   }
 
   // Recommended defensive items based on active analyzed hero
@@ -946,7 +946,7 @@
                   src={hero.head} 
                   alt={hero.name} 
                   class="w-16 h-16 rounded-2xl object-cover bg-gray-50 border border-gray-200 shadow-sm shrink-0" 
-                  on:error={(e) => e.target.src = "src/assets/logo1.png"}
+                  on:error={(e) => e.target.src = "/logo1.png"}
                 />
                 <div>
                   <h3 class="text-base font-extrabold text-gray-800 tracking-tight">{hero.name}</h3>
@@ -1076,7 +1076,7 @@
                     src={hero.head} 
                     alt={hero.name} 
                     class="w-8 h-8 rounded-lg object-cover bg-gray-100 border border-gray-100"
-                    on:error={(e) => e.target.src = "src/assets/logo1.png"}
+                    on:error={(e) => e.target.src = "/logo1.png"}
                   />
                   <span class="text-sm font-bold text-gray-800">{hero.name}</span>
                 </button>
@@ -1104,7 +1104,7 @@
             src={selectedHero.head} 
             alt={selectedHero.name} 
             class="w-20 h-20 rounded-2xl object-cover bg-gray-50 border border-gray-200 shadow-md"
-            on:error={(e) => e.target.src = "src/assets/logo1.png"}
+            on:error={(e) => e.target.src = "/logo1.png"}
           />
           <div class="space-y-1">
             <h2 class="text-2xl font-black text-gray-800 tracking-tight">{selectedHero.name}</h2>
@@ -1136,7 +1136,7 @@
                           src={getHeroHead(sub.heroid)} 
                           alt="Sub Hero" 
                           class="w-10 h-10 rounded-xl object-cover border border-gray-200"
-                          on:error={(e) => e.target.src = sub.hero?.data?.head || "src/assets/logo1.png"}
+                          on:error={(e) => e.target.src = sub.hero?.data?.head || "/logo1.png"}
                         />
                         <div>
                           <p class="text-sm font-extrabold text-gray-800">{getHeroName(sub.heroid)}</p>
@@ -1172,7 +1172,7 @@
                           src={getHeroHead(sub.heroid)} 
                           alt="Sub Hero" 
                           class="w-10 h-10 rounded-xl object-cover border border-gray-200"
-                          on:error={(e) => e.target.src = sub.hero?.data?.head || "src/assets/logo1.png"}
+                          on:error={(e) => e.target.src = sub.hero?.data?.head || "/logo1.png"}
                         />
                         <div>
                           <p class="text-sm font-extrabold text-gray-800">{getHeroName(sub.heroid)}</p>
@@ -1215,7 +1215,7 @@
                           src={getHeroHead(sub.heroid)} 
                           alt="Sub Hero" 
                           class="w-10 h-10 rounded-xl object-cover border border-gray-200"
-                          on:error={(e) => e.target.src = sub.hero?.data?.head || "src/assets/logo1.png"}
+                          on:error={(e) => e.target.src = sub.hero?.data?.head || "/logo1.png"}
                         />
                         <div>
                           <p class="text-sm font-extrabold text-gray-800">{getHeroName(sub.heroid)}</p>
@@ -1251,7 +1251,7 @@
                           src={getHeroHead(sub.heroid)} 
                           alt="Sub Hero" 
                           class="w-10 h-10 rounded-xl object-cover border border-gray-200"
-                          on:error={(e) => e.target.src = sub.hero?.data?.head || "src/assets/logo1.png"}
+                          on:error={(e) => e.target.src = sub.hero?.data?.head || "/logo1.png"}
                         />
                         <div>
                           <p class="text-sm font-extrabold text-gray-800">{getHeroName(sub.heroid)}</p>
@@ -1422,7 +1422,7 @@
                             src={match.hid_e?.ix} 
                             alt={match.hid_e?.n} 
                             class="w-10 h-10 rounded-lg object-cover border border-gray-100"
-                            on:error={(e) => e.target.src = "src/assets/logo1.png"}
+                            on:error={(e) => e.target.src = "/logo1.png"}
                           />
                           <div>
                             <p class="text-xs font-extrabold text-gray-800">{match.hid_e?.n || "Unknown"}</p>
@@ -1701,7 +1701,7 @@
                                       src={p.hid_e?.ix} 
                                       alt={p.hid_e?.n} 
                                       class="w-11 h-11 rounded-xl object-cover border border-gray-100 shadow-sm"
-                                      on:error={(e) => e.target.src = "src/assets/logo1.png"}
+                                      on:error={(e) => e.target.src = "/logo1.png"}
                                     />
                                     <span class="absolute -bottom-1 -right-1 bg-gray-800 text-white font-black text-[9px] w-4.5 h-4.5 rounded-full flex items-center justify-center border border-white">
                                       {p.hlvl}
@@ -1793,7 +1793,7 @@
                                                 src={counter.head} 
                                                 alt={counter.name}
                                                 class="w-14 h-14 rounded-xl object-cover border border-gray-200 shadow-md"
-                                                on:error={(e) => e.target.src = "src/assets/logo1.png"}
+                                                on:error={(e) => e.target.src = "/logo1.png"}
                                               />
                                               <span class="text-[10px] font-bold text-gray-855 truncate w-full">{counter.name}</span>
                                               <span class="text-[8px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
@@ -1818,7 +1818,7 @@
                                                  src={getItemImage(item.name)} 
                                                  alt={item.name}
                                                  class="w-14 h-14 rounded-xl object-cover bg-gray-50 border border-gray-200 shadow-md"
-                                                 on:error={(e) => e.target.src = "src/assets/logo1.png"}
+                                                 on:error={(e) => e.target.src = "/logo1.png"}
                                                />
                                                <span class="text-[10px] font-black text-gray-855 tracking-tight leading-tight block truncate w-full">{item.name}</span>
                                                <span class="text-[8px] font-bold text-gray-400 block leading-tight">{item.desc}</span>

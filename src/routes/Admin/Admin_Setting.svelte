@@ -1339,7 +1339,7 @@
   <aside class="{isSidebarOpen ? 'w-64' : 'w-0'} absolute md:relative z-50 overflow-hidden bg-[#0a2e52] text-white flex flex-col h-full shrink-0 shadow-xl transition-all duration-300 whitespace-nowrap">
     <div class="flex items-center justify-between px-6 py-8">
       <div class="flex items-center gap-3">
-        <img src="src/assets/logo1.png" alt="logo" class="w-10 h-12 text-white" />
+        <img src="/logo1.png" alt="logo" class="w-10 h-12 text-white" />
         <span class="text-2xl font-bold tracking-wider">E-Sport</span>
       </div>
       <button on:click={toggleSidebar} class="p-1 transition-colors rounded-md cursor-pointer md:hidden bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white">
@@ -1396,7 +1396,7 @@
           <div class="fixed inset-0 z-40" on:click={closeDropdown} aria-hidden="true"></div>
           <div class="absolute right-0 z-50 w-48 py-2 mt-2 bg-white border border-gray-100 rounded-lg shadow-lg">
             <button on:click={() => { closeDropdown(); }} class="flex items-center w-full gap-2 px-4 py-2.5 text-sm text-gray-700 transition-colors text-left hover:bg-gray-50">
-              <img class="w-4 h-4" src="src/assets/setting.svg" alt="Settings" /> Settings
+              <img class="w-4 h-4" src="/setting.svg" alt="Settings" /> Settings
             </button>
             <div class="w-full h-px my-1 bg-gray-100"></div>
             <button on:click={handleLogout} class="flex items-center w-full gap-2 px-4 py-2.5 text-sm font-medium text-red-600 transition-colors text-left hover:bg-red-50">
@@ -1610,7 +1610,7 @@
                       {:else if websiteSettings.heroImage}
                         <img src={`/assets/${websiteSettings.heroImage}`} alt="Hero Saat Ini" class="w-full h-full object-cover" />
                       {:else}
-                        <img src="src/assets/bglogin.jpg" alt="Default Hero" class="w-full h-full object-cover" />
+                        <img src="/bglogin.jpg" alt="Default Hero" class="w-full h-full object-cover" />
                         <span class="absolute top-3 left-3 bg-gray-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">Default Sistem</span>
                       {/if}
                     </div>
@@ -1676,7 +1676,7 @@
                       {:else if websiteSettings.aboutImage}
                         <img src={`/assets/${websiteSettings.aboutImage}`} alt="About Us Saat Ini" class="w-full h-full object-cover" />
                       {:else}
-                        <img src="src/assets/bglogin.jpg" alt="Default About Us" class="w-full h-full object-cover" />
+                        <img src="/bglogin.jpg" alt="Default About Us" class="w-full h-full object-cover" />
                         <span class="absolute top-3 left-3 bg-gray-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">Default Sistem</span>
                       {/if}
                     </div>

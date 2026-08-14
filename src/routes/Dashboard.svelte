@@ -207,7 +207,7 @@
             class="absolute overflow-hidden top-0 right-0 w-full h-full flex items-center justify-center z-0 opacity-20 pointer-events-none"
         >
             <img
-                src="src/assets/bg-bawah.svg"
+                src="/bg-bawah.svg"
                 alt="Background Waves"
                 class="min-w-[1000px] w-full h-full object-cover"
             />
@@ -253,7 +253,7 @@
                 <img
                     src={settings.heroImage
                         ? `/assets/${settings.heroImage}`
-                        : "src/assets/bglogin.jpg"}
+                        : "/bglogin.jpg"}
                     alt="Hero E-Sports"
                     class="w-full h-full object-cover"
                 />
@@ -347,17 +347,13 @@
                 <img
                     src={settings.aboutImage
                         ? `/assets/${settings.aboutImage}`
-                        : "src/assets/bglogin.jpg"}
+                        : "/bglogin.jpg"}
                     alt="Background About"
                     class="w-full h-full object-cover"
                 />
             </div>
         </div>
     </section>
-
-    <!-- ========================= -->
-    <!-- GALLERY -->
-    <!-- ========================= -->
 
     <section
         id="gallery"

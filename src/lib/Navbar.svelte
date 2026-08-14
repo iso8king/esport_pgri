@@ -11,7 +11,7 @@
   <div class="max-w-[1600px] mx-auto flex items-center justify-between">
     
     <a href="/" class="flex items-center gap-2 sm:gap-4 text-white hover:opacity-80 transition-opacity">
-      <img src="src/assets/logo1.png" alt="logo" class="w-10 sm:w-12 md:w-[60px] h-auto object-contain">
+      <img src="/logo1.png" alt="logo" class="w-10 sm:w-12 md:w-[60px] h-auto object-contain">
       <h2 class="font-semibold text-lg sm:text-xl md:text-2xl whitespace-nowrap">E-Sport PGRI</h2>
     </a>
 
