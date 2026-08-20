@@ -1,6 +1,6 @@
 <script>
   import { push } from "svelte-spa-router";
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import Swal from "sweetalert2";
   import {fetchWithAuth} from "$lib/auth.js"
 
@@ -48,6 +48,7 @@
   let otpInputs = [];
   let pendingProfileData = null;
   let pendingPasswordData = null;
+  let pendingFaceData = null; // base64 string hasil capture wajah
   let otpAction = null;
   let isLoadingOtp = false;
   let countdown = 0;
@@ -319,11 +320,73 @@
   }
   // ============ END PFP ============
 
+  // ============================================================
+  // FACE REGISTRATION — camera helpers
+  // ============================================================
+  let faceVideoEl;
+  let faceCanvasEl;
+  let faceStream = null;
+  let faceCameraReady = false;
+
+  async function startFaceCamera() {
+    try {
+      faceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      faceVideoEl.srcObject = faceStream;
+      faceCameraReady = true;
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Kamera Tidak Bisa Diakses',
+        text: 'Pastikan kamu sudah mengizinkan akses kamera di browser.',
+        confirmButtonColor: '#ef4444'
+      });
+    }
+  }
+
+  function stopFaceCamera() {
+    if (faceStream) {
+      faceStream.getTracks().forEach(track => track.stop());
+      faceStream = null;
+    }
+    faceCameraReady = false;
+  }
+
+  function captureFaceBase64() {
+    return new Promise((resolve) => {
+      const context = faceCanvasEl.getContext('2d');
+      faceCanvasEl.width = faceVideoEl.videoWidth;
+      faceCanvasEl.height = faceVideoEl.videoHeight;
+      context.drawImage(faceVideoEl, 0, 0, faceCanvasEl.width, faceCanvasEl.height);
+      resolve(faceCanvasEl.toDataURL('image/jpeg', 0.9));
+    });
+  }
+
+  function base64ToBlob(base64) {
+    const [header, data] = base64.split(',');
+    const mime = header.match(/:(.*?);/)[1];
+    const binary = atob(data);
+    const array = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      array[i] = binary.charCodeAt(i);
+    }
+    return new Blob([array], { type: mime });
+  }
+
+  function switchTab(tabId) {
+    if (activeTab === tabId) return;
+    if (activeTab === 'face') stopFaceCamera();
+    activeTab = tabId;
+    if (tabId === 'face') startFaceCamera();
+  }
+  // ============ END FACE ============
+
   function saveOtpState() {
     if (isOtpModalOpen) {
       sessionStorage.setItem("otp_modal_state_admin", JSON.stringify({
         pendingProfileData,
         pendingPasswordData,
+        pendingFaceData,
         otpAction,
         otpCodes,
         countdown,
@@ -925,6 +988,44 @@
     }
   }
 
+  // Update wajah ke server
+  async function updateFaceToServer(base64Image) {
+    try {
+      const blob = base64ToBlob(base64Image);
+      const formData = new FormData();
+      formData.append('face', blob, 'face-register.jpg');
+
+      const response = await fetchWithAuth("/api/users/upload/face", {
+        method: "POST",
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (response.status === 200) {
+        return true;
+      } else {
+        const data = await response.json();
+        const errorMessage = data.errors || data.message || 'Gagal mendaftarkan wajah';
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal Mendaftarkan Wajah',
+          text: errorMessage,
+          confirmButtonColor: '#ef4444'
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error("Error updating face:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
+        confirmButtonColor: '#ef4444'
+      });
+      return false;
+    }
+  }
+
   function handleOtpInput(index, event) {
     const value = event.target.value;
     if (!/^\d*$/.test(value)) {
@@ -977,6 +1078,7 @@
     isOtpModalOpen = false;
     pendingProfileData = null;
     pendingPasswordData = null;
+    pendingFaceData = null;
     otpAction = null;
     if (countdownInterval) clearInterval(countdownInterval);
     countdown = 0;
@@ -1116,6 +1218,31 @@
     }
   }
 
+  // Fungsi saveFace dengan OTP
+  async function saveFace() {
+    if (isSendingOtp) return;
+
+    if (!faceCameraReady) {
+      Swal.fire({ icon: "warning", title: "Kamera belum siap!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+
+    const captured = await captureFaceBase64();
+    pendingFaceData = captured;
+    otpAction = 'face';
+
+    const otpSent = await sendOtpEmail();
+    if (otpSent) {
+      otpCodes = ['', '', '', ''];
+      isOtpModalOpen = true;
+      saveOtpState();
+
+      setTimeout(() => {
+        if (otpInputs[0]) otpInputs[0].focus();
+      }, 100);
+    }
+  }
+
   // Fungsi handleVerifyOtp
   async function handleVerifyOtp() {
     const otpCode = otpCodes.join('');
@@ -1157,6 +1284,12 @@
         if (updateSuccess) {
           password = { current: "", new: "", confirm: "" };
         }
+      } else if (otpAction === 'face') {
+        updateSuccess = await updateFaceToServer(pendingFaceData);
+        if (updateSuccess) {
+          stopFaceCamera();
+          pendingFaceData = null;
+        }
       }
       
       if (updateSuccess) {
@@ -1166,7 +1299,11 @@
         
         Swal.fire({
           icon: "success", 
-          title: otpAction === 'profile' ? "Profil berhasil diperbarui!" : "Password berhasil diubah!", 
+          title: otpAction === 'profile'
+            ? "Profil berhasil diperbarui!"
+            : otpAction === 'password'
+              ? "Password berhasil diubah!"
+              : "Wajah berhasil didaftarkan!",
           text: "Data Anda telah diperbarui. Silakan login kembali dengan data baru Anda.",
           confirmButtonColor: "#0a4682",
           confirmButtonText: "Login Kembali"
@@ -1255,6 +1392,7 @@
         if (savedState) {
           pendingProfileData = savedState.pendingProfileData;
           pendingPasswordData = savedState.pendingPasswordData;
+          pendingFaceData = savedState.pendingFaceData;
           otpAction = savedState.otpAction;
           otpCodes = savedState.otpCodes || ['', '', '', ''];
           otpTimestamp = savedState.otpTimestamp;
@@ -1269,6 +1407,8 @@
             password.current = pendingPasswordData.current;
             password.new = pendingPasswordData.new;
             password.confirm = pendingPasswordData.new;
+          } else if (otpAction === 'face' && pendingFaceData) {
+            // base64 sudah otomatis ke-restore dari sessionStorage, tidak perlu aksi tambahan
           }
           
           const elapsedSeconds = Math.floor((Date.now() - otpTimestamp) / 1000);
@@ -1306,6 +1446,10 @@
     };
   });
 
+  onDestroy(() => {
+    stopFaceCamera();
+  });
+
   function handleLogout() {
     Swal.fire({
       title: "Yakin ingin keluar?", icon: "warning", showCancelButton: true,
@@ -1325,6 +1469,7 @@
   const tabs = [
     { id: "profile", label: "Profil", icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
     { id: "password", label: "Keamanan", icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" },
+    { id: "face", label: "Wajah", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
     { id: "website", label: "Website", icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" }
   ];
 </script>
@@ -1451,7 +1596,7 @@
         <div class="flex gap-1 p-1 bg-white border border-gray-200 shadow-sm rounded-xl">
           {#each tabs as tab}
             <button
-              on:click={() => activeTab = tab.id}
+              on:click={() => switchTab(tab.id)}
               class="flex items-center justify-center flex-1 gap-2 px-3 py-2.5 text-sm font-semibold rounded-lg transition-all {activeTab === tab.id ? 'bg-[#0a4682] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}"
             >
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d={tab.icon} /></svg>
@@ -1560,6 +1705,55 @@
                     Menghubungkan...
                   {:else}
                     Ubah Password
+                  {/if}
+                </button>
+              </div>
+            </div>
+          </div>
+
+        <!-- Tab Content: Wajah -->
+        {:else if activeTab === "face"}
+          <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
+            <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
+              <h3 class="text-lg font-bold text-gray-800">Verifikasi Wajah</h3>
+              <p class="text-sm text-gray-500">Daftarkan wajahmu untuk login lebih cepat</p>
+            </div>
+
+            <div class="p-5 space-y-4 sm:p-6">
+              <div class="relative rounded-2xl overflow-hidden bg-gray-900 aspect-square max-w-sm mx-auto">
+                <!-- svelte-ignore a11y-media-has-caption -->
+                <video
+                  bind:this={faceVideoEl}
+                  autoplay
+                  playsinline
+                  muted
+                  class="w-full h-full object-cover scale-x-[-1]"
+                ></video>
+                <canvas bind:this={faceCanvasEl} class="hidden"></canvas>
+
+                {#if !faceCameraReady}
+                  <div class="absolute inset-0 flex items-center justify-center text-gray-300 text-sm">
+                    Mengaktifkan kamera...
+                  </div>
+                {/if}
+
+                <div class="absolute inset-6 border-2 border-white/40 rounded-2xl pointer-events-none"></div>
+              </div>
+
+              <p class="text-xs text-gray-500 text-center">
+                Posisikan wajahmu di dalam kotak dengan pencahayaan yang cukup, lalu tekan tombol di bawah.
+              </p>
+
+              <div class="flex justify-end pt-2">
+                <button on:click={saveFace}
+                  disabled={isSendingOtp || !faceCameraReady}
+                  class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 bg-[#0a4682] hover:bg-[#0c5599]"
+                >
+                  {#if isSendingOtp}
+                    <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Menghubungkan...
+                  {:else}
+                    Daftarkan Wajah
                   {/if}
                 </button>
               </div>

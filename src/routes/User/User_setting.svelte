@@ -1,6 +1,6 @@
 <script>
   import { push } from "svelte-spa-router";
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import Swal from "sweetalert2";
   import {fetchWithAuth} from "$lib/auth.js"
 
@@ -20,22 +20,23 @@
 
   let profile = { nama: "", email: "", username: "",role: "User", team: "", game_id: "", server_id: "" };
   let password = { current: "", new: "", confirm: "" };
-  
+
   let initialProfile = { nama: "", email: "", username: "", game_id: "", server_id: "" };
 
-  $: isProfileUnchanged = 
+  $: isProfileUnchanged =
     profile.nama === initialProfile.nama &&
     profile.username === initialProfile.username &&
     profile.email === initialProfile.email &&
     profile.game_id === initialProfile.game_id &&
     profile.server_id === initialProfile.server_id;
-  
+
   // State untuk modal OTP
   let isOtpModalOpen = false;
   let otpCodes = ['', '', '', ''];
   let otpInputs = [];
   let pendingProfileData = null;
   let pendingPasswordData = null;
+  let pendingFaceData = null; // base64 string hasil capture wajah
   let otpAction = null;
   let isLoadingOtp = false;
   let countdown = 0;
@@ -48,6 +49,7 @@
       sessionStorage.setItem("otp_modal_state", JSON.stringify({
         pendingProfileData,
         pendingPasswordData,
+        pendingFaceData,
         otpAction,
         otpCodes,
         countdown,
@@ -96,6 +98,66 @@
     }
   }
 
+  // ============================================================
+  // FACE REGISTRATION — camera helpers
+  // ============================================================
+  let faceVideoEl;
+  let faceCanvasEl;
+  let faceStream = null;
+  let faceCameraReady = false;
+
+  async function startFaceCamera() {
+    try {
+      faceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+      faceVideoEl.srcObject = faceStream;
+      faceCameraReady = true;
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Kamera Tidak Bisa Diakses',
+        text: 'Pastikan kamu sudah mengizinkan akses kamera di browser.',
+        confirmButtonColor: '#ef4444'
+      });
+    }
+  }
+
+  function stopFaceCamera() {
+    if (faceStream) {
+      faceStream.getTracks().forEach(track => track.stop());
+      faceStream = null;
+    }
+    faceCameraReady = false;
+  }
+
+  function captureFaceBase64() {
+    return new Promise((resolve) => {
+      const context = faceCanvasEl.getContext('2d');
+      faceCanvasEl.width = faceVideoEl.videoWidth;
+      faceCanvasEl.height = faceVideoEl.videoHeight;
+      context.drawImage(faceVideoEl, 0, 0, faceCanvasEl.width, faceCanvasEl.height);
+      resolve(faceCanvasEl.toDataURL('image/jpeg', 0.9));
+    });
+  }
+
+  function base64ToBlob(base64) {
+    const [header, data] = base64.split(',');
+    const mime = header.match(/:(.*?);/)[1];
+    const binary = atob(data);
+    const array = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      array[i] = binary.charCodeAt(i);
+    }
+    return new Blob([array], { type: mime });
+  }
+
+  function switchTab(tabId) {
+    if (activeTab === tabId) return;
+    if (activeTab === 'face') stopFaceCamera();
+    activeTab = tabId;
+    if (tabId === 'face') startFaceCamera();
+  }
+
   onMount(() => {
     const name = localStorage.getItem("user_name");
     if (name) {
@@ -106,10 +168,10 @@
       profile.game_id = localStorage.getItem("user_game_id") || "";
       profile.server_id = localStorage.getItem("user_server_id") || "";
       profile.team = getTeamName();
-      
+
       // Ambil PFP dari localStorage
       userPfp = getPfp();
-      
+
       // Simpan data profil awal
       initialProfile = {
         nama: profile.nama,
@@ -156,10 +218,11 @@
         if (savedState) {
           pendingProfileData = savedState.pendingProfileData;
           pendingPasswordData = savedState.pendingPasswordData;
+          pendingFaceData = savedState.pendingFaceData;
           otpAction = savedState.otpAction;
           otpCodes = savedState.otpCodes || ['', '', '', ''];
           otpTimestamp = savedState.otpTimestamp;
-          
+
           if (otpAction === 'profile' && pendingProfileData) {
             profile.nama = pendingProfileData.nama;
             profile.username = pendingProfileData.username;
@@ -170,19 +233,21 @@
             password.current = pendingPasswordData.current;
             password.new = pendingPasswordData.new;
             password.confirm = pendingPasswordData.new;
+          } else if (otpAction === 'face' && pendingFaceData) {
+            // base64 sudah otomatis ke-restore dari sessionStorage, tidak perlu aksi tambahan
           }
-          
+
           const elapsedSeconds = Math.floor((Date.now() - otpTimestamp) / 1000);
           const remainingCountdown = 60 - elapsedSeconds;
-          
+
           isOtpModalOpen = true;
-          
+
           if (remainingCountdown > 0) {
             startCountdown(remainingCountdown);
           } else {
             countdown = 0;
           }
-          
+
           setTimeout(() => {
             if (otpInputs[0]) otpInputs[0].focus();
           }, 100);
@@ -199,14 +264,18 @@
         refreshPfp();
       }
     };
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   });
-  
+
+  onDestroy(() => {
+    stopFaceCamera();
+  });
+
   function startCountdown(seconds = 60) {
     countdown = seconds;
     saveOtpState();
@@ -229,9 +298,9 @@
         credentials: 'include'
       });
       const data = await response.json();
-      
+
       Swal.close();
-      
+
       otpTimestamp = Date.now();
       startCountdown(60);
       saveOtpState();
@@ -260,8 +329,8 @@
           'Content-Type': 'application/json'
         },
         credentials: 'include',
-        body: JSON.stringify({ 
-          otp: otpCode 
+        body: JSON.stringify({
+          otp: otpCode
         })
       });
 
@@ -274,7 +343,7 @@
           text: data.message || 'Kode verifikasi yang kamu masukkan salah!',
           confirmButtonColor: '#ef4444'
         });
-        return false;  
+        return false;
       } else {
         Swal.fire({
           icon: 'success',
@@ -284,22 +353,20 @@
           timer: 1500,
           showConfirmButton: false
         });
-        return true; 
+        return true;
       }
-      
+
     } catch (error) {
       console.error("Error verifying OTP:", error);
-      return false; 
+      return false;
     }
   }
 
-  // Update profile ke server - FIXED
+  // Update profile ke server
   async function updateProfileToServer(updatedData) {
     try {
-      // Siapkan data yang akan dikirim
       const dataToSend = {};
-      
-      // Cek perubahan menggunakan updatedData yang dikirim
+
       if (updatedData.nama && updatedData.nama !== initialProfile.nama) {
         dataToSend.nama = updatedData.nama;
       }
@@ -315,8 +382,7 @@
       if (updatedData.server_id && updatedData.server_id !== initialProfile.server_id) {
         dataToSend.server_id = updatedData.server_id;
       }
-      
-      // Jika tidak ada perubahan, return true
+
       if (Object.keys(dataToSend).length === 0) {
         Swal.fire({
           icon: "info",
@@ -326,7 +392,7 @@
         });
         return true;
       }
-      
+
       const response = await fetchWithAuth("/api/users/updateprofile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -335,7 +401,6 @@
       });
 
       if (response.status === 200) {
-        // Update localStorage dan initialProfile untuk semua field yang berubah
         if (dataToSend.nama) {
           localStorage.setItem("user_name", dataToSend.nama);
           initialProfile.nama = dataToSend.nama;
@@ -362,7 +427,7 @@
           initialProfile.server_id = dataToSend.server_id;
           profile.server_id = dataToSend.server_id;
         }
-        
+
         return true;
       } else {
         const data = await response.json();
@@ -425,7 +490,45 @@
     }
   }
 
-  
+  // Update wajah ke server
+  async function updateFaceToServer(base64Image) {
+    try {
+      const blob = base64ToBlob(base64Image);
+      const formData = new FormData();
+      formData.append('face', blob, 'face-register.jpg');
+
+      const response = await fetchWithAuth("/api/users/upload/face", {
+        method: "POST",
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (response.status === 200) {
+        return true;
+      } else {
+        const data = await response.json();
+        const errorMessage = data.errors || data.message || 'Gagal mendaftarkan wajah';
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal Mendaftarkan Wajah',
+          text: errorMessage,
+          confirmButtonColor: '#ef4444'
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error("Error updating face:", error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
+        confirmButtonColor: '#ef4444'
+      });
+      return false;
+    }
+  }
+
+
   function handleOtpInput(index, event) {
     const value = event.target.value;
     if (!/^\d*$/.test(value)) {
@@ -478,24 +581,23 @@
     isOtpModalOpen = false;
     pendingProfileData = null;
     pendingPasswordData = null;
+    pendingFaceData = null;
     otpAction = null;
     if (countdownInterval) clearInterval(countdownInterval);
     countdown = 0;
     otpTimestamp = null;
     sessionStorage.removeItem("otp_modal_state");
   }
-  
+
   async function saveProfile() {
     if (isSendingOtp) return;
-    
-    // Cek perubahan pada SEMUA field
+
     const hasNamaChange = profile.nama.trim() !== initialProfile.nama && profile.nama.trim() !== "";
     const hasUsernameChange = profile.username.trim() !== initialProfile.username && profile.username.trim() !== "";
     const hasEmailChange = profile.email.trim() !== initialProfile.email && profile.email.trim() !== "";
     const hasGameIdChange = profile.game_id.trim() !== initialProfile.game_id && profile.game_id.trim() !== "";
     const hasServerIdChange = profile.server_id.trim() !== initialProfile.server_id && profile.server_id.trim() !== "";
-    
-    // Jika tidak ada perubahan sama sekali
+
     if (!hasNamaChange && !hasUsernameChange && !hasEmailChange && !hasGameIdChange && !hasServerIdChange) {
       Swal.fire({
         icon: "info",
@@ -505,8 +607,7 @@
       });
       return;
     }
-    
-    // Validasi field yang diubah
+
     if (hasNamaChange && !profile.nama.trim()) {
       Swal.fire({ icon: "warning", title: "Nama tidak boleh kosong!", confirmButtonColor: "#0a4682" });
       return;
@@ -542,13 +643,13 @@
       otpCodes = ['', '', '', ''];
       isOtpModalOpen = true;
       saveOtpState();
-      
+
       setTimeout(() => {
         if (otpInputs[0]) otpInputs[0].focus();
       }, 100);
     }
   }
-  
+
   async function savePassword() {
     if (isSendingOtp) return;
     if (!password.current || !password.new || !password.confirm) {
@@ -572,7 +673,7 @@
         body: JSON.stringify({ password: password.current }),
         credentials: 'include'
       });
-      
+
       if (checkResponse.status !== 200) {
         const checkData = await checkResponse.json();
         Swal.fire({
@@ -607,16 +708,40 @@
       otpCodes = ['', '', '', ''];
       isOtpModalOpen = true;
       saveOtpState();
-      
+
       setTimeout(() => {
         if (otpInputs[0]) otpInputs[0].focus();
       }, 100);
     }
   }
-  
+
+  async function saveFace() {
+    if (isSendingOtp) return;
+
+    if (!faceCameraReady) {
+      Swal.fire({ icon: "warning", title: "Kamera belum siap!", confirmButtonColor: "#0a4682" });
+      return;
+    }
+
+    const captured = await captureFaceBase64();
+    pendingFaceData = captured;
+    otpAction = 'face';
+
+    const otpSent = await sendOtpEmail();
+    if (otpSent) {
+      otpCodes = ['', '', '', ''];
+      isOtpModalOpen = true;
+      saveOtpState();
+
+      setTimeout(() => {
+        if (otpInputs[0]) otpInputs[0].focus();
+      }, 100);
+    }
+  }
+
   async function handleVerifyOtp() {
     const otpCode = otpCodes.join('');
-    
+
     if (otpCode.length !== 4) {
       Swal.fire({
         icon: 'warning',
@@ -631,7 +756,7 @@
 
     try {
       const isValid = await verifyOtp(otpCode);
-      
+
       if (!isValid) {
         otpCodes = ['', '', '', ''];
         otpInputs[0]?.focus();
@@ -653,16 +778,26 @@
         if (updateSuccess) {
           password = { current: "", new: "", confirm: "" };
         }
+      } else if (otpAction === 'face') {
+        updateSuccess = await updateFaceToServer(pendingFaceData);
+        if (updateSuccess) {
+          stopFaceCamera();
+          pendingFaceData = null;
+        }
       }
-      
+
       if (updateSuccess) {
         resetOtpModal();
         localStorage.clear();
         sessionStorage.clear();
-        
+
         Swal.fire({
-          icon: "success", 
-          title: otpAction === 'profile' ? "Profil berhasil diperbarui!" : "Password berhasil diubah!", 
+          icon: "success",
+          title: otpAction === 'profile'
+            ? "Profil berhasil diperbarui!"
+            : otpAction === 'password'
+              ? "Password berhasil diubah!"
+              : "Wajah berhasil didaftarkan!",
           text: "Data Anda telah diperbarui. Silakan login kembali dengan data baru Anda.",
           confirmButtonColor: "#0a4682",
           confirmButtonText: "Login Kembali"
@@ -670,7 +805,7 @@
           push('/signin');
         });
       }
-      
+
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -690,7 +825,7 @@
     }
     sendOtpEmail();
   }
-  
+
   function handleLogout() {
     Swal.fire({
       title: "Yakin ingin keluar?", icon: "warning", showCancelButton: true,
@@ -714,6 +849,7 @@
   const tabs = [
     { id: "profile", label: "Profil", icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
     { id: "password", label: "Keamanan", icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" },
+    { id: "face", label: "Wajah", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
   ];
 
   // Profile Picture variables & handlers
@@ -737,7 +873,6 @@
   function handleFileSelect(e) {
     const file = e.target.files[0];
     if (file) {
-      // Validasi tipe file
       const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
       if (!allowedTypes.includes(file.type)) {
         Swal.fire({
@@ -749,8 +884,7 @@
         e.target.value = '';
         return;
       }
-      
-      // Validasi ukuran file (max 2MB)
+
       if (file.size > 2 * 1024 * 1024) {
         Swal.fire({
           icon: 'warning',
@@ -761,7 +895,7 @@
         e.target.value = '';
         return;
       }
-      
+
       const reader = new FileReader();
       reader.onload = (event) => {
         imageSrc = event.target.result;
@@ -784,22 +918,20 @@
       ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
       ctx.fillStyle = "#f3f4f6";
       ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
-      
+
       const baseSize = Math.min(img.width, img.height);
       const initScale = 200 / baseSize;
       const drawWidth = img.width * initScale * scale;
       const drawHeight = img.height * initScale * scale;
-      
+
       const x = (150 - drawWidth / 2) + posX;
       const y = (150 - drawHeight / 2) + posY;
 
-      // Blur background effect
       ctx.save();
       ctx.filter = "blur(8px) brightness(0.65)";
       ctx.drawImage(img, x, y, drawWidth, drawHeight);
       ctx.restore();
 
-      // Sharp image inside circle
       ctx.save();
       ctx.beginPath();
       ctx.arc(150, 150, 100, 0, Math.PI * 2);
@@ -810,7 +942,6 @@
       ctx.drawImage(img, x, y, drawWidth, drawHeight);
       ctx.restore();
 
-      // Circle outline
       ctx.beginPath();
       ctx.arc(150, 150, 100, 0, Math.PI * 2);
       ctx.strokeStyle = "#ffffff";
@@ -863,11 +994,10 @@
 
   async function uploadPfp() {
     if (!canvasEl || !imageSrc) return;
-    
+
     isUploadingPfp = true;
-    
+
     try {
-      // Create temporary canvas for cropping
       const outputCanvas = document.createElement("canvas");
       outputCanvas.width = 200;
       outputCanvas.height = 200;
@@ -877,7 +1007,7 @@
 
       const img = new Image();
       img.src = imageSrc;
-      
+
       await new Promise((resolve) => {
         img.onload = () => {
           oCtx.save();
@@ -898,14 +1028,11 @@
         };
       });
 
-      // Convert to blob
       const blob = await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/jpeg', 0.9));
-      
-      // Create FormData
+
       const formData = new FormData();
       formData.append('avatar', blob, 'pfp.jpg');
 
-      // Show loading
       Swal.fire({
         title: 'Mengupload foto...',
         text: 'Mohon tunggu sebentar',
@@ -926,19 +1053,15 @@
       Swal.close();
 
       if (response.status === 200) {
-        // Save pfp filename from response
         const pfpFilename = result.data?.pfp
-        
+
         if (pfpFilename) {
-          // Simpan nama file ke localStorage
           localStorage.setItem("user_avatar", pfpFilename);
-          // Tampilkan melalui proxy dengan timestamp untuk force refresh
           const timestamp = Date.now();
           userPfp = `/avatar/${pfpFilename}?t=${timestamp}`;
-          // Force re-render
           userPfp = userPfp;
         }
-        
+
         isCropModalOpen = false;
 
         Swal.fire({
@@ -1054,12 +1177,12 @@
         </div>
 
         <!-- Profile Card Top -->
-        <div class="relative p-6 overflow-hidden text-white shadow-lg sm:p-8 bg-gradient-to-r 
-          {hasTeam() ? 'from-[#0a4682] to-[#126bc2]' : 'from-red-700 to-rose-600'} 
+        <div class="relative p-6 overflow-hidden text-white shadow-lg sm:p-8 bg-gradient-to-r
+          {hasTeam() ? 'from-[#0a4682] to-[#126bc2]' : 'from-red-700 to-rose-600'}
           rounded-2xl"
         >
           <div class="relative z-10 flex flex-col items-center gap-4 sm:flex-row sm:items-center">
-            
+
             <div class="relative group cursor-pointer shrink-0" on:click={triggerFileInput} title="Tekan untuk mengubah foto profil">
               {#if userPfp}
                 <img src={userPfp} alt="Profile" class="w-20 h-20 rounded-full border-2 border-white/40 object-cover shadow-md" />
@@ -1068,7 +1191,6 @@
                   {currentUserName.charAt(0).toUpperCase()}
                 </div>
               {/if}
-              <!-- Hover Overlay trigger -->
               <div class="absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -1076,21 +1198,21 @@
                 </svg>
               </div>
             </div>
-            
+
             <div class="text-center sm:text-left">
               <h3 class="text-xl font-bold sm:text-2xl">{currentUserName}</h3>
-              
+
               <p class="text-sm {hasTeam() ? 'text-blue-200' : 'text-red-100'}">
                 {profile.role} • {getTeamName()}
               </p>
-              
+
               <p class="mt-1 text-xs {hasTeam() ? 'text-blue-300' : 'text-red-200'}">
                 {profile.email}
               </p>
             </div>
-            
+
           </div>
-          
+
           <div class="absolute w-64 h-64 bg-white rounded-full opacity-5 -right-10 -top-20 blur-2xl pointer-events-none"></div>
         </div>
 
@@ -1098,10 +1220,10 @@
         <div class="flex gap-1 p-1 bg-white border border-gray-200 shadow-sm rounded-xl">
           {#each tabs as tab}
             <button
-              on:click={() => activeTab = tab.id}
-              class="flex items-center justify-center flex-1 gap-2 px-3 py-2.5 text-sm font-semibold rounded-lg transition-all 
-                {activeTab === tab.id 
-                  ? (hasTeam() ? 'bg-[#0a4682] text-white shadow-md' : 'bg-red-700 text-white shadow-md') 
+              on:click={() => switchTab(tab.id)}
+              class="flex items-center justify-center flex-1 gap-2 px-3 py-2.5 text-sm font-semibold rounded-lg transition-all
+                {activeTab === tab.id
+                  ? (hasTeam() ? 'bg-[#0a4682] text-white shadow-md' : 'bg-red-700 text-white shadow-md')
                   : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'}"
             >
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1119,47 +1241,47 @@
               <h3 class="text-lg font-bold text-gray-800">Informasi Profil</h3>
               <p class="text-sm text-gray-500">Perbarui informasi pribadi Anda</p>
             </div>
-            
+
             <div class="p-5 space-y-5 sm:p-6">
               <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
                   <label for="nama" class="block mb-1.5 text-sm font-semibold text-gray-700">Nama Lengkap</label>
-                  <input id="nama" type="text" bind:value={profile.nama} 
+                  <input id="nama" type="text" bind:value={profile.nama}
                     class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
                 </div>
                 <div>
                   <label for="username" class="block mb-1.5 text-sm font-semibold text-gray-700">Username</label>
-                  <input id="username" type="text" bind:value={profile.username} 
+                  <input id="username" type="text" bind:value={profile.username}
                     class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
                 </div>
                 <div>
                   <label for="role" class="block mb-1.5 text-sm font-semibold text-gray-700">Role</label>
-                  <input id="role" type="text" value={profile.role} disabled 
+                  <input id="role" type="text" value={profile.role} disabled
                     class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
                 </div>
               </div>
-              
+
               <div>
                 <label for="email" class="block mb-1.5 text-sm font-semibold text-gray-700">Email</label>
-                <input id="email" type="email" bind:value={profile.email} 
+                <input id="email" type="email" bind:value={profile.email}
                   class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
               </div>
-              
+
               <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
                   <label for="game_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Game ID</label>
-                  <input id="game_id" type="text" bind:value={profile.game_id} 
+                  <input id="game_id" type="text" bind:value={profile.game_id}
                     class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
                 </div>
                 <div>
                   <label for="server_id" class="block mb-1.5 text-sm font-semibold text-gray-700">Server ID</label>
-                  <input id="server_id" type="text" bind:value={profile.server_id} 
+                  <input id="server_id" type="text" bind:value={profile.server_id}
                     class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
                 </div>
               </div>
-              
+
               <div class="flex justify-end pt-2">
-                <button on:click={saveProfile} 
+                <button on:click={saveProfile}
                   disabled={isSendingOtp || isProfileUnchanged}
                   class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 {hasTeam() ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
                 >
@@ -1173,7 +1295,7 @@
               </div>
             </div>
           </div>
-        
+
         <!-- Tab Content: Password -->
         {:else if activeTab === "password"}
           <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
@@ -1181,14 +1303,14 @@
               <h3 class="text-lg font-bold text-gray-800">Ubah Password</h3>
               <p class="text-sm text-gray-500">Pastikan password Anda aman</p>
             </div>
-            
+
             <div class="p-5 space-y-5 sm:p-6">
               <div>
                 <label for="currentPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Password Saat Ini</label>
                 <input id="currentPw" type="password" bind:value={password.current} placeholder="Masukkan password saat ini"
                   class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
               </div>
-              
+
               <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
                   <label for="newPw" class="block mb-1.5 text-sm font-semibold text-gray-700">Password Baru</label>
@@ -1201,9 +1323,9 @@
                     class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}" />
                 </div>
               </div>
-              
+
               <div class="flex justify-end pt-2">
-                <button on:click={savePassword} 
+                <button on:click={savePassword}
                   disabled={isSendingOtp}
                   class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 {hasTeam() ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
                 >
@@ -1212,6 +1334,55 @@
                     Menghubungkan...
                   {:else}
                     Ubah Password
+                  {/if}
+                </button>
+              </div>
+            </div>
+          </div>
+
+        <!-- Tab Content: Wajah -->
+        {:else if activeTab === "face"}
+          <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
+            <div class="px-5 py-4 border-b border-gray-100 sm:px-6">
+              <h3 class="text-lg font-bold text-gray-800">Verifikasi Wajah</h3>
+              <p class="text-sm text-gray-500">Daftarkan wajahmu untuk login lebih cepat</p>
+            </div>
+
+            <div class="p-5 space-y-4 sm:p-6">
+              <div class="relative rounded-2xl overflow-hidden bg-gray-900 aspect-square max-w-sm mx-auto">
+                <!-- svelte-ignore a11y-media-has-caption -->
+                <video
+                  bind:this={faceVideoEl}
+                  autoplay
+                  playsinline
+                  muted
+                  class="w-full h-full object-cover scale-x-[-1]"
+                ></video>
+                <canvas bind:this={faceCanvasEl} class="hidden"></canvas>
+
+                {#if !faceCameraReady}
+                  <div class="absolute inset-0 flex items-center justify-center text-gray-300 text-sm">
+                    Mengaktifkan kamera...
+                  </div>
+                {/if}
+
+                <div class="absolute inset-6 border-2 border-white/40 rounded-2xl pointer-events-none"></div>
+              </div>
+
+              <p class="text-xs text-gray-500 text-center">
+                Posisikan wajahmu di dalam kotak dengan pencahayaan yang cukup, lalu tekan tombol di bawah.
+              </p>
+
+              <div class="flex justify-end pt-2">
+                <button on:click={saveFace}
+                  disabled={isSendingOtp || !faceCameraReady}
+                  class="px-6 py-2.5 text-sm font-bold text-white transition-all rounded-lg shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 {hasTeam() ? 'bg-[#0a4682] hover:bg-[#0c5599]' : 'bg-red-700 hover:bg-red-800'}"
+                >
+                  {#if isSendingOtp}
+                    <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Menghubungkan...
+                  {:else}
+                    Daftarkan Wajah
                   {/if}
                 </button>
               </div>
@@ -1228,9 +1399,9 @@
 {#if isOtpModalOpen}
 <div class="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 w-screen h-screen animate-fade-in">
   <div class="absolute inset-0 cursor-pointer bg-black/60 backdrop-blur-sm" on:click={resetOtpModal} aria-hidden="true"></div>
-  
+
   <div class="relative flex flex-col w-full max-w-md bg-white shadow-2xl rounded-2xl overflow-hidden">
-    
+
     <div class="flex items-start justify-between p-6 border-b border-gray-100">
       <div>
         <h2 class="text-xl font-black text-gray-800">Verifikasi Kode OTP</h2>
@@ -1268,8 +1439,8 @@
       <div class="text-center">
         <p class="text-sm text-gray-500">
           Tidak menerima kode?
-          <button 
-            on:click={resendOtp} 
+          <button
+            on:click={resendOtp}
             disabled={countdown > 0}
             class="font-semibold text-[#0a4682] hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -1284,14 +1455,14 @@
 
       <!-- Action Buttons -->
       <div class="flex gap-3 pt-4">
-        <button 
-          on:click={resetOtpModal} 
+        <button
+          on:click={resetOtpModal}
           class="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-colors border border-gray-300 rounded-lg hover:bg-gray-50"
         >
           Batal
         </button>
-        <button 
-          on:click={handleVerifyOtp} 
+        <button
+          on:click={handleVerifyOtp}
           disabled={isLoadingOtp}
           class="flex-1 px-4 py-2.5 text-sm font-bold text-white transition-colors bg-[#0a4682] rounded-lg hover:bg-[#0c5599] disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -1330,8 +1501,8 @@
       <!-- Canvas Area -->
       <div class="p-6 flex flex-col items-center justify-center bg-gray-50 border-b border-gray-100">
         <p class="text-xs text-gray-500 mb-4 text-center">Geser foto dengan mouse/jari</p>
-        
-        <div 
+
+        <div
           class="relative w-[300px] h-[300px] bg-gray-100 rounded-xl overflow-hidden shadow-inner border border-gray-200 cursor-move select-none"
           on:mousedown={handleMouseDown}
           on:mousemove={handleMouseMove}
@@ -1350,28 +1521,28 @@
             <span>Perkecil</span>
             <span>Perbesar</span>
           </div>
-          <input 
-            type="range" 
-            min="0.5" 
-            max="3" 
-            step="0.05" 
-            value={scale} 
-            on:input={handleZoom} 
-            class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0a2e52]" 
+          <input
+            type="range"
+            min="0.5"
+            max="3"
+            step="0.05"
+            value={scale}
+            on:input={handleZoom}
+            class="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0a2e52]"
           />
         </div>
       </div>
 
       <!-- Action Buttons -->
       <div class="px-5 py-4 bg-gray-50 flex items-center justify-end gap-3">
-        <button 
-          on:click={() => isCropModalOpen = false} 
+        <button
+          on:click={() => isCropModalOpen = false}
           class="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
         >
           Batal
         </button>
-        <button 
-          on:click={uploadPfp} 
+        <button
+          on:click={uploadPfp}
           disabled={isUploadingPfp}
           class="px-5 py-2 text-sm font-bold text-white bg-[#0a2e52] hover:bg-[#0c5599] rounded-lg shadow-md active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
@@ -1391,16 +1562,16 @@
   .animate-fade-in {
     animation: fadeIn 0.2s ease-in-out;
   }
-  
+
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
   }
-  
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
-  
+
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
