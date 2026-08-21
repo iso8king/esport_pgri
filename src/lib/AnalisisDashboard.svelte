@@ -67,8 +67,8 @@
     hasShownApiError = true;
     Swal.fire({
       icon: "error",
-      title: "Koneksi API Gagal",
-      text: message,
+      title: "Error",
+      text: "Fitur Sedang Dalam Perbaikan, Kembali lagi nanti ya!",
       confirmButtonColor: "#0a2e52"
     });
     clearTimeout(apiErrorTimeout);

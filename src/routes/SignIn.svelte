@@ -115,6 +115,7 @@
     localStorage.setItem("tim", data.data.tim);
     localStorage.setItem("akun_dibuat", data.data.akun_dibuat);
     localStorage.setItem("user_avatar", data.data.pfp);
+    localStorage.setItem("kelas", data.data.kelas)
 
     stopCamera();
 
@@ -185,6 +186,7 @@
       localStorage.setItem("tim", data.data.tim);
       localStorage.setItem("akun_dibuat", data.data.akun_dibuat);
       localStorage.setItem("user_avatar", data.data.avatar);
+      localStorage.setItem("kelas" , data.data.kelas)
 
       Swal.fire({
         icon: 'success',

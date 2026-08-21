@@ -1,52 +1,208 @@
 <script>
   import { push } from "svelte-spa-router";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import Swal from "sweetalert2";
-  import {fetchWithAuth} from "$lib/auth.js"
+  import { fetchWithAuth } from "$lib/auth.js";
 
-  if(localStorage.getItem("role") !== "user"){
-    Swal.fire({
-        icon: 'error',
-        title: 'Unauthorized',
-        text: 'Redirecting......',
-        confirmButtonColor: '#0b5ba2'
-      }).then(() => {
-        push('/admin/beranda');
-      });
-  }
+  // ============================================================
+  // BASIC STATE
+  // ============================================================
 
   let currentUserName = "Loading...";
   let activeTab = "profile";
 
-  let profile = { nama: "", email: "", username: "",role: "User", team: "", game_id: "", server_id: "" };
-  let password = { current: "", new: "", confirm: "" };
+  let userPfp = "";
 
-  let initialProfile = { nama: "", email: "", username: "", game_id: "", server_id: "" };
+  // ============================================================
+  // PROFILE
+  // ============================================================
+
+  let profile = {
+    nama: "",
+    email: "",
+    username: "",
+    role: "User",
+    team: "",
+    game_id: "",
+    server_id: "",
+    kelas: ""
+  };
+
+  let initialProfile = {
+    nama: "",
+    email: "",
+    username: "",
+    game_id: "",
+    server_id: "",
+    kelas: ""
+  };
+
+  let password = {
+    current: "",
+    new: "",
+    confirm: ""
+  };
+
+  // ============================================================
+  // PROFILE CHANGE CHECK
+  // ============================================================
 
   $: isProfileUnchanged =
-    profile.nama === initialProfile.nama &&
-    profile.username === initialProfile.username &&
-    profile.email === initialProfile.email &&
-    profile.game_id === initialProfile.game_id &&
-    profile.server_id === initialProfile.server_id;
+    profile.nama.trim() === initialProfile.nama.trim() &&
+    profile.username.trim() === initialProfile.username.trim() &&
+    profile.email.trim() === initialProfile.email.trim() &&
+    profile.game_id.trim() === initialProfile.game_id.trim() &&
+    profile.server_id.trim() === initialProfile.server_id.trim() &&
+    profile.kelas.trim() === initialProfile.kelas.trim();
 
-  // State untuk modal OTP
+  // ============================================================
+  // OTP STATE
+  // ============================================================
+
   let isOtpModalOpen = false;
-  let otpCodes = ['', '', '', ''];
+  let otpCodes = ["", "", "", ""];
   let otpInputs = [];
+
   let pendingProfileData = null;
   let pendingPasswordData = null;
-  let pendingFaceData = null; // base64 string hasil capture wajah
+  let pendingFaceData = null;
+
   let otpAction = null;
+
   let isLoadingOtp = false;
+  let isSendingOtp = false;
+
   let countdown = 0;
   let countdownInterval = null;
-  let isSendingOtp = false;
   let otpTimestamp = null;
 
+  // ============================================================
+  // CAMERA STATE
+  // ============================================================
+
+  let faceVideoEl;
+  let faceCanvasEl;
+  let faceStream = null;
+  let faceCameraReady = false;
+
+  // ============================================================
+  // SIDEBAR
+  // ============================================================
+
+  let innerWidth = 0;
+  let isSidebarOpen = true;
+
+  // ============================================================
+  // DROPDOWN
+  // ============================================================
+
+  let isDropdownOpen = false;
+
+  // ============================================================
+  // PROFILE PICTURE / CROP
+  // ============================================================
+
+  let isCropModalOpen = false;
+  let imageSrc = "";
+
+  let scale = 1;
+  let posX = 0;
+  let posY = 0;
+
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+
+  let canvasEl;
+  let isUploadingPfp = false;
+
+  // ============================================================
+  // TABS
+  // ============================================================
+
+  const tabs = [
+    {
+      id: "profile",
+      label: "Profil",
+      icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+    },
+    {
+      id: "password",
+      label: "Keamanan",
+      icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+    },
+    {
+      id: "face",
+      label: "Wajah",
+      icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+    }
+  ];
+
+  // ============================================================
+  // TEAM
+  // ============================================================
+
+  function hasTeam() {
+    const tim = localStorage.getItem("tim");
+
+    return (
+      tim &&
+      tim !== "null" &&
+      tim !== "undefined" &&
+      tim.trim() !== ""
+    );
+  }
+
+  function getTeamName() {
+    const tim = localStorage.getItem("tim");
+
+    if (
+      !tim ||
+      tim === "null" ||
+      tim === "undefined" ||
+      tim.trim() === ""
+    ) {
+      return "Tidak Ada Tim";
+    }
+
+    return tim;
+  }
+
+  // ============================================================
+  // PROFILE PICTURE
+  // ============================================================
+
+  function getPfp() {
+    const pfp = localStorage.getItem("user_avatar");
+
+    if (
+      pfp &&
+      pfp !== "null" &&
+      pfp !== "undefined"
+    ) {
+      return `/avatar/${pfp}?t=${Date.now()}`;
+    }
+
+    return "";
+  }
+
+  function refreshPfp() {
+    userPfp = getPfp();
+  }
+
+  // ============================================================
+  // OTP STORAGE
+  // ============================================================
+
   function saveOtpState() {
-    if (isOtpModalOpen) {
-      sessionStorage.setItem("otp_modal_state", JSON.stringify({
+    if (!isOtpModalOpen) {
+      sessionStorage.removeItem("otp_modal_state");
+      return;
+    }
+
+    sessionStorage.setItem(
+      "otp_modal_state",
+      JSON.stringify({
         pendingProfileData,
         pendingPasswordData,
         pendingFaceData,
@@ -54,334 +210,543 @@
         otpCodes,
         countdown,
         otpTimestamp: otpTimestamp || Date.now()
-      }));
-    } else {
-      sessionStorage.removeItem("otp_modal_state");
-    }
-  }
-
-  // Helper function untuk cek apakah user punya tim
-  function hasTeam() {
-    const tim = localStorage.getItem("tim");
-    return tim && tim !== "null" && tim !== "undefined" && tim.trim() !== "";
-  }
-
-  // Helper function untuk mendapatkan nama tim
-  function getTeamName() {
-    const tim = localStorage.getItem("tim");
-    if (!tim || tim === "null" || tim === "undefined" || tim.trim() === "") {
-      return "Tidak Ada Tim";
-    }
-    return tim;
-  }
-
-  // Ambil PFP dari localStorage dan tampilkan melalui proxy
-  function getPfp() {
-    const pfp = localStorage.getItem("user_avatar");
-    if (pfp && pfp !== "null" && pfp !== "undefined") {
-      const timestamp = Date.now();
-      return `/avatar/${pfp}?t=${timestamp}`;
-    }
-    return "";
-  }
-
-  // Refresh PFP
-  function refreshPfp() {
-    const pfp = localStorage.getItem("user_avatar");
-    if (pfp && pfp !== "null" && pfp !== "undefined") {
-      const timestamp = Date.now();
-      userPfp = `/avatar/${pfp}?t=${timestamp}`;
-      // Force re-render
-      userPfp = userPfp;
-    } else {
-      userPfp = "";
-    }
+      })
+    );
   }
 
   // ============================================================
-  // FACE REGISTRATION — camera helpers
+  // ON MOUNT
   // ============================================================
-  let faceVideoEl;
-  let faceCanvasEl;
-  let faceStream = null;
-  let faceCameraReady = false;
 
-  async function startFaceCamera() {
-    try {
-      faceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-      faceVideoEl.srcObject = faceStream;
-      faceCameraReady = true;
-    } catch (err) {
-      console.error(err);
-      Swal.fire({
-        icon: 'error',
-        title: 'Kamera Tidak Bisa Diakses',
-        text: 'Pastikan kamu sudah mengizinkan akses kamera di browser.',
-        confirmButtonColor: '#ef4444'
-      });
-    }
-  }
+  onMount(async () => {
+    // ----------------------------------------------------------
+    // USER DATA
+    // ----------------------------------------------------------
 
-  function stopFaceCamera() {
-    if (faceStream) {
-      faceStream.getTracks().forEach(track => track.stop());
-      faceStream = null;
-    }
-    faceCameraReady = false;
-  }
-
-  function captureFaceBase64() {
-    return new Promise((resolve) => {
-      const context = faceCanvasEl.getContext('2d');
-      faceCanvasEl.width = faceVideoEl.videoWidth;
-      faceCanvasEl.height = faceVideoEl.videoHeight;
-      context.drawImage(faceVideoEl, 0, 0, faceCanvasEl.width, faceCanvasEl.height);
-      resolve(faceCanvasEl.toDataURL('image/jpeg', 0.9));
-    });
-  }
-
-  function base64ToBlob(base64) {
-    const [header, data] = base64.split(',');
-    const mime = header.match(/:(.*?);/)[1];
-    const binary = atob(data);
-    const array = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      array[i] = binary.charCodeAt(i);
-    }
-    return new Blob([array], { type: mime });
-  }
-
-  function switchTab(tabId) {
-    if (activeTab === tabId) return;
-    if (activeTab === 'face') stopFaceCamera();
-    activeTab = tabId;
-    if (tabId === 'face') startFaceCamera();
-  }
-
-  onMount(() => {
     const name = localStorage.getItem("user_name");
-    if (name) {
-      currentUserName = name;
-      profile.nama = name;
-      profile.username = localStorage.getItem("username") || "";
-      profile.email = localStorage.getItem("email") || "";
-      profile.game_id = localStorage.getItem("user_game_id") || "";
-      profile.server_id = localStorage.getItem("user_server_id") || "";
-      profile.team = getTeamName();
 
-      // Ambil PFP dari localStorage
-      userPfp = getPfp();
-
-      // Simpan data profil awal
-      initialProfile = {
-        nama: profile.nama,
-        username: profile.username,
-        email: profile.email,
-        game_id: profile.game_id,
-        server_id: profile.server_id
-      };
-    } else {
+    if (!name) {
       push("/");
-    }
-
-    const userRole = localStorage.getItem("user_role");
-    if(userRole !== "user"){
-      Swal.fire({
-        icon: 'error',
-        title: 'Unauthorized',
-        text: 'Redirecting......',
-        confirmButtonColor: '#0b5ba2'
-      }).then(() => {
-        push('/admin/beranda');
-      });
       return;
     }
+
+    currentUserName = name;
+
+    profile.nama = name;
+    profile.username = localStorage.getItem("username") || "";
+    profile.email = localStorage.getItem("email") || "";
+    profile.game_id = localStorage.getItem("user_game_id") || "";
+    profile.server_id = localStorage.getItem("user_server_id") || "";
+    profile.kelas = localStorage.getItem("kelas") || "";
+    profile.team = getTeamName();
+
+    // ==========================================================
+    // PROFILE INITIAL STATE
+    // ==========================================================
+
+    initialProfile = {
+      nama: profile.nama,
+      username: profile.username,
+      email: profile.email,
+      game_id: profile.game_id,
+      server_id: profile.server_id,
+      kelas: profile.kelas
+    };
+
+    // ==========================================================
+    // PROFILE PICTURE
+    // ==========================================================
+
+    userPfp = getPfp();
+
+    // ==========================================================
+    // ROLE CHECK
+    // ==========================================================
+
+    const userRole = localStorage.getItem("user_role") || localStorage.getItem("role");
+
+    if (userRole !== "user") {
+      await Swal.fire({
+        icon: "error",
+        title: "Unauthorized",
+        text: "Redirecting......",
+        confirmButtonColor: "#0b5ba2"
+      });
+
+      push("/admin/beranda");
+      return;
+    }
+
+    // ==========================================================
+    // STATUS CHECK
+    // ==========================================================
 
     const userStatus = localStorage.getItem("status");
-    if(userStatus === "false"){
-      Swal.fire({
-        icon: 'warning',
-        title: 'Belum Verifikasi',
-        text: 'Redirecting......',
-        confirmButtonColor: '#0b5ba2'
-      }).then(() => {
-        push('/verification');
+
+    if (userStatus === "false") {
+      await Swal.fire({
+        icon: "warning",
+        title: "Belum Verifikasi",
+        text: "Redirecting......",
+        confirmButtonColor: "#0b5ba2"
       });
+
+      push("/verification");
       return;
     }
 
-    // Restore OTP state if exists
-    const savedOtpStateStr = sessionStorage.getItem("otp_modal_state");
-    if (savedOtpStateStr) {
-      try {
-        const savedState = JSON.parse(savedOtpStateStr);
-        if (savedState) {
-          pendingProfileData = savedState.pendingProfileData;
-          pendingPasswordData = savedState.pendingPasswordData;
-          pendingFaceData = savedState.pendingFaceData;
-          otpAction = savedState.otpAction;
-          otpCodes = savedState.otpCodes || ['', '', '', ''];
-          otpTimestamp = savedState.otpTimestamp;
+    // ==========================================================
+    // RESTORE OTP
+    // ==========================================================
 
-          if (otpAction === 'profile' && pendingProfileData) {
-            profile.nama = pendingProfileData.nama;
-            profile.username = pendingProfileData.username;
-            profile.email = pendingProfileData.email;
-            profile.game_id = pendingProfileData.game_id;
-            profile.server_id = pendingProfileData.server_id;
-          } else if (otpAction === 'password' && pendingPasswordData) {
-            password.current = pendingPasswordData.current;
-            password.new = pendingPasswordData.new;
-            password.confirm = pendingPasswordData.new;
-          } else if (otpAction === 'face' && pendingFaceData) {
-            // base64 sudah otomatis ke-restore dari sessionStorage, tidak perlu aksi tambahan
-          }
+    restoreOtpState();
 
-          const elapsedSeconds = Math.floor((Date.now() - otpTimestamp) / 1000);
-          const remainingCountdown = 60 - elapsedSeconds;
+    // ==========================================================
+    // VISIBILITY CHANGE
+    // ==========================================================
 
-          isOtpModalOpen = true;
-
-          if (remainingCountdown > 0) {
-            startCountdown(remainingCountdown);
-          } else {
-            countdown = 0;
-          }
-
-          setTimeout(() => {
-            if (otpInputs[0]) otpInputs[0].focus();
-          }, 100);
-        }
-      } catch (e) {
-        console.error("Error restoring OTP state:", e);
-        sessionStorage.removeItem("otp_modal_state");
-      }
-    }
-
-    // Refresh PFP saat tab aktif kembali
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         refreshPfp();
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
     };
   });
 
+  // ============================================================
+  // RESTORE OTP STATE
+  // ============================================================
+
+  function restoreOtpState() {
+    const savedOtpStateStr = sessionStorage.getItem("otp_modal_state");
+
+    if (!savedOtpStateStr) {
+      return;
+    }
+
+    try {
+      const savedState = JSON.parse(savedOtpStateStr);
+
+      if (!savedState) {
+        return;
+      }
+
+      pendingProfileData = savedState.pendingProfileData || null;
+      pendingPasswordData = savedState.pendingPasswordData || null;
+      pendingFaceData = savedState.pendingFaceData || null;
+      otpAction = savedState.otpAction || null;
+      otpCodes = savedState.otpCodes || ["", "", "", ""];
+      otpTimestamp = savedState.otpTimestamp || Date.now();
+
+      // ========================================================
+      // RESTORE PROFILE
+      // ========================================================
+
+      if (otpAction === "profile" && pendingProfileData) {
+        profile.nama = pendingProfileData.nama ?? "";
+        profile.username = pendingProfileData.username ?? "";
+        profile.email = pendingProfileData.email ?? "";
+        profile.game_id = pendingProfileData.game_id ?? "";
+        profile.server_id = pendingProfileData.server_id ?? "";
+        profile.kelas = pendingProfileData.kelas ?? "";
+      }
+
+      // ========================================================
+      // RESTORE PASSWORD
+      // ========================================================
+
+      if (otpAction === "password" && pendingPasswordData) {
+        password.current = pendingPasswordData.current || "";
+        password.new = pendingPasswordData.new || "";
+        password.confirm = pendingPasswordData.new || "";
+      }
+
+      // ========================================================
+      // RESTORE COUNTDOWN
+      // ========================================================
+
+      const elapsedSeconds = Math.floor((Date.now() - otpTimestamp) / 1000);
+      const remainingCountdown = 60 - elapsedSeconds;
+
+      isOtpModalOpen = true;
+
+      if (remainingCountdown > 0) {
+        startCountdown(remainingCountdown);
+      } else {
+        countdown = 0;
+      }
+
+      setTimeout(() => {
+        otpInputs[0]?.focus();
+      }, 100);
+
+    } catch (error) {
+      console.error("Error restoring OTP state:", error);
+      sessionStorage.removeItem("otp_modal_state");
+    }
+  }
+
+  // ============================================================
+  // ON DESTROY
+  // ============================================================
+
   onDestroy(() => {
     stopFaceCamera();
+
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
   });
 
+  // ============================================================
+  // TAB
+  // ============================================================
+
+  async function switchTab(tabId) {
+    if (activeTab === tabId) {
+      return;
+    }
+
+    if (activeTab === "face") {
+      stopFaceCamera();
+    }
+
+    activeTab = tabId;
+
+    if (tabId === "face") {
+      await tick();
+      await startFaceCamera();
+    }
+  }
+
+  // ============================================================
+  // CAMERA
+  // ============================================================
+
+  async function startFaceCamera() {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Browser tidak mendukung kamera.");
+      }
+
+      stopFaceCamera();
+
+      faceStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user"
+        },
+        audio: false
+      });
+
+      await tick();
+
+      if (!faceVideoEl) {
+        throw new Error("Element video belum tersedia.");
+      }
+
+      faceVideoEl.srcObject = faceStream;
+
+      try {
+        await faceVideoEl.play();
+      } catch (playError) {
+        console.warn("Video autoplay gagal:", playError);
+      }
+
+      faceCameraReady = true;
+
+    } catch (error) {
+      console.error("Camera error:", error);
+      faceCameraReady = false;
+
+      Swal.fire({
+        icon: "error",
+        title: "Kamera Tidak Bisa Diakses",
+        text: "Pastikan kamera tersedia dan izin kamera sudah diberikan.",
+        confirmButtonColor: "#ef4444"
+      });
+    }
+  }
+
+  function stopFaceCamera() {
+    if (faceStream) {
+      faceStream.getTracks().forEach((track) => track.stop());
+      faceStream = null;
+    }
+
+    if (faceVideoEl) {
+      faceVideoEl.srcObject = null;
+    }
+
+    faceCameraReady = false;
+  }
+
+  function captureFaceBase64() {
+    return new Promise((resolve, reject) => {
+      if (!faceVideoEl || !faceCanvasEl) {
+        reject(new Error("Camera element belum tersedia."));
+        return;
+      }
+
+      if (!faceVideoEl.videoWidth || !faceVideoEl.videoHeight) {
+        reject(new Error("Video kamera belum siap."));
+        return;
+      }
+
+      const context = faceCanvasEl.getContext("2d");
+
+      faceCanvasEl.width = faceVideoEl.videoWidth;
+      faceCanvasEl.height = faceVideoEl.videoHeight;
+
+      context.drawImage(
+        faceVideoEl,
+        0,
+        0,
+        faceCanvasEl.width,
+        faceCanvasEl.height
+      );
+
+      resolve(faceCanvasEl.toDataURL("image/jpeg", 0.9));
+    });
+  }
+
+  function base64ToBlob(base64) {
+    const parts = base64.split(",");
+
+    if (parts.length !== 2) {
+      throw new Error("Format base64 tidak valid.");
+    }
+
+    const header = parts[0];
+    const data = parts[1];
+    const mimeMatch = header.match(/:(.*?);/);
+    const mime = mimeMatch?.[1] || "image/jpeg";
+    const binary = atob(data);
+    const array = new Uint8Array(binary.length);
+
+    for (let i = 0; i < binary.length; i++) {
+      array[i] = binary.charCodeAt(i);
+    }
+
+    return new Blob([array], { type: mime });
+  }
+
+  // ============================================================
+  // COUNTDOWN
+  // ============================================================
+
   function startCountdown(seconds = 60) {
-    countdown = seconds;
+    countdown = Math.max(0, Number(seconds) || 0);
     saveOtpState();
-    if (countdownInterval) clearInterval(countdownInterval);
+
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+    }
+
     countdownInterval = setInterval(() => {
       if (countdown > 0) {
         countdown--;
         saveOtpState();
       } else {
         clearInterval(countdownInterval);
+        countdownInterval = null;
       }
     }, 1000);
   }
 
-  async function sendOtpEmail() {
-    isSendingOtp = true;
-    try {
-      const response = await fetchWithAuth("/api/users/request/otp", {
-        method: "POST",
-        credentials: 'include'
-      });
-      const data = await response.json();
+  // ============================================================
+  // SEND OTP
+  // ============================================================
 
-      Swal.close();
+  async function sendOtpEmail() {
+    if (isSendingOtp) {
+      return false;
+    }
+
+    isSendingOtp = true;
+
+    try {
+      const response = await fetchWithAuth(
+        "/api/users/request/otp",
+        {
+          method: "POST",
+          credentials: "include"
+        }
+      );
+
+      let data = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      console.log("OTP response:", data);
+
+      if (!response.ok) {
+        Swal.fire({
+          icon: "error",
+          title: "Gagal Kirim OTP",
+          text: data.message || data.errors || "Gagal mengirim OTP.",
+          confirmButtonColor: "#ef4444"
+        });
+
+        return false;
+      }
 
       otpTimestamp = Date.now();
       startCountdown(60);
-      saveOtpState();
+
       return true;
+
     } catch (error) {
       console.error("Error sending OTP:", error);
-      Swal.close();
+
       Swal.fire({
-        icon: 'error',
-        title: 'Gagal Kirim OTP',
-        text: 'Terjadi kesalahan, silakan coba lagi',
-        confirmButtonColor: '#ef4444'
+        icon: "error",
+        title: "Gagal Kirim OTP",
+        text: "Terjadi kesalahan, silakan coba lagi.",
+        confirmButtonColor: "#ef4444"
       });
+
       return false;
+
     } finally {
       isSendingOtp = false;
     }
   }
 
-  // Verifikasi OTP
+  // ============================================================
+  // VERIFY OTP
+  // ============================================================
+
   async function verifyOtp(otpCode) {
     try {
-      const response = await fetchWithAuth("/api/users/verify", {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          otp: otpCode
-        })
-      });
+      const response = await fetchWithAuth(
+        "/api/users/verify",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify({ otp: otpCode })
+        }
+      );
 
-      const data = await response.json();
+      let data = {};
 
-      if (response.status !== 200) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Verifikasi Gagal',
-          text: data.message || 'Kode verifikasi yang kamu masukkan salah!',
-          confirmButtonColor: '#ef4444'
-        });
-        return false;
-      } else {
-        Swal.fire({
-          icon: 'success',
-          title: 'Verifikasi Berhasil!',
-          text: `Kode OTP valid!`,
-          confirmButtonColor: '#3b82f6',
-          timer: 1500,
-          showConfirmButton: false
-        });
-        return true;
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
       }
+
+      if (!response.ok) {
+        Swal.fire({
+          icon: "error",
+          title: "Verifikasi Gagal",
+          text: data.message || "Kode verifikasi yang kamu masukkan salah!",
+          confirmButtonColor: "#ef4444"
+        });
+
+        return false;
+      }
+
+      return true;
 
     } catch (error) {
       console.error("Error verifying OTP:", error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Gagal melakukan verifikasi OTP.",
+        confirmButtonColor: "#ef4444"
+      });
+
       return false;
     }
   }
 
-  // Update profile ke server
+  // ============================================================
+  // UPDATE PROFILE
+  // ============================================================
+
   async function updateProfileToServer(updatedData) {
     try {
       const dataToSend = {};
 
-      if (updatedData.nama && updatedData.nama !== initialProfile.nama) {
-        dataToSend.nama = updatedData.nama;
+      const nama = (updatedData.nama ?? "").trim();
+      const username = (updatedData.username ?? "").trim();
+      const email = (updatedData.email ?? "").trim();
+      const game_id = (updatedData.game_id ?? "").trim();
+      const server_id = (updatedData.server_id ?? "").trim();
+      const kelas = (updatedData.kelas ?? "").trim();
+
+      // ========================================================
+      // NAMA
+      // ========================================================
+
+      if (nama !== initialProfile.nama.trim()) {
+        dataToSend.nama = nama;
       }
-      if (updatedData.username && updatedData.username !== initialProfile.username) {
-        dataToSend.username = updatedData.username;
+
+      // ========================================================
+      // USERNAME
+      // ========================================================
+
+      if (username !== initialProfile.username.trim()) {
+        dataToSend.username = username;
       }
-      if (updatedData.email && updatedData.email !== initialProfile.email) {
-        dataToSend.email = updatedData.email;
+
+      // ========================================================
+      // EMAIL
+      // ========================================================
+
+      if (email !== initialProfile.email.trim()) {
+        dataToSend.email = email;
       }
-      if (updatedData.game_id && updatedData.game_id !== initialProfile.game_id) {
-        dataToSend.game_id = updatedData.game_id;
+
+      // ========================================================
+      // GAME ID
+      // ========================================================
+
+      if (game_id !== initialProfile.game_id.trim()) {
+        dataToSend.game_id = game_id;
       }
-      if (updatedData.server_id && updatedData.server_id !== initialProfile.server_id) {
-        dataToSend.server_id = updatedData.server_id;
+
+      // ========================================================
+      // SERVER ID
+      // ========================================================
+
+      if (server_id !== initialProfile.server_id.trim()) {
+        dataToSend.server_id = server_id;
       }
+
+      // ========================================================
+      // KELAS
+      // ========================================================
+
+      if (kelas !== initialProfile.kelas.trim()) {
+        dataToSend.kelas = kelas;
+      }
+
+      // ========================================================
+      // NO CHANGE
+      // ========================================================
 
       if (Object.keys(dataToSend).length === 0) {
         Swal.fire({
@@ -390,365 +755,708 @@
           text: "Tidak ada data yang diubah untuk disimpan.",
           confirmButtonColor: "#0a4682"
         });
+
         return true;
       }
 
-      const response = await fetchWithAuth("/api/users/updateprofile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dataToSend),
-        credentials: 'include'
+      console.log("PROFILE PAYLOAD:", dataToSend);
+
+      // ========================================================
+      // REQUEST
+      // ========================================================
+
+      const response = await fetchWithAuth(
+        "/api/users/updateprofile",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify(dataToSend)
+        }
+      );
+
+      let data = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      // ========================================================
+      // SUCCESS
+      // ========================================================
+
+      if (response.ok) {
+        applyUpdatedProfile(dataToSend);
+        return true;
+      }
+
+      // ========================================================
+      // ERROR
+      // ========================================================
+
+      const errorMessage = data.errors || data.message || "Gagal memperbarui profil.";
+
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Update Profil",
+        text: errorMessage,
+        confirmButtonColor: "#ef4444"
       });
 
-      if (response.status === 200) {
-        if (dataToSend.nama) {
-          localStorage.setItem("user_name", dataToSend.nama);
-          initialProfile.nama = dataToSend.nama;
-          currentUserName = dataToSend.nama;
-          profile.nama = dataToSend.nama;
-        }
-        if (dataToSend.username) {
-          localStorage.setItem("username", dataToSend.username);
-          initialProfile.username = dataToSend.username;
-          profile.username = dataToSend.username;
-        }
-        if (dataToSend.email) {
-          localStorage.setItem("email", dataToSend.email);
-          initialProfile.email = dataToSend.email;
-          profile.email = dataToSend.email;
-        }
-        if (dataToSend.game_id) {
-          localStorage.setItem("user_game_id", dataToSend.game_id);
-          initialProfile.game_id = dataToSend.game_id;
-          profile.game_id = dataToSend.game_id;
-        }
-        if (dataToSend.server_id) {
-          localStorage.setItem("user_server_id", dataToSend.server_id);
-          initialProfile.server_id = dataToSend.server_id;
-          profile.server_id = dataToSend.server_id;
-        }
+      console.error("Update profile failed:", data);
 
-        return true;
-      } else {
-        const data = await response.json();
-        const errorMessage = data.errors || data.message || 'Gagal memperbarui profil';
-        Swal.fire({
-          icon: 'error',
-          title: 'Gagal Update Profil',
-          text: errorMessage,
-          confirmButtonColor: '#ef4444'
-        });
-        return false;
-      }
+      return false;
+
     } catch (error) {
       console.error("Error updating profile:", error);
+
       Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
-        confirmButtonColor: '#ef4444'
+        icon: "error",
+        title: "Error",
+        text: "Terjadi kesalahan pada server. Silakan coba lagi.",
+        confirmButtonColor: "#ef4444"
       });
+
       return false;
     }
   }
 
-  // Update password ke server
+  // ============================================================
+  // APPLY UPDATED PROFILE
+  // ============================================================
+
+  function applyUpdatedProfile(data) {
+    // ----------------------------------------------------------
+    // NAMA
+    // ----------------------------------------------------------
+
+    if (data.nama !== undefined) {
+      const value = String(data.nama).trim();
+
+      localStorage.setItem("user_name", value);
+      profile.nama = value;
+      initialProfile.nama = value;
+      currentUserName = value;
+    }
+
+    // ----------------------------------------------------------
+    // USERNAME
+    // ----------------------------------------------------------
+
+    if (data.username !== undefined) {
+      const value = String(data.username).trim();
+
+      localStorage.setItem("username", value);
+      profile.username = value;
+      initialProfile.username = value;
+    }
+
+    // ----------------------------------------------------------
+    // EMAIL
+    // ----------------------------------------------------------
+
+    if (data.email !== undefined) {
+      const value = String(data.email).trim();
+
+      localStorage.setItem("email", value);
+      profile.email = value;
+      initialProfile.email = value;
+    }
+
+    // ----------------------------------------------------------
+    // GAME ID
+    // ----------------------------------------------------------
+
+    if (data.game_id !== undefined) {
+      const value = String(data.game_id).trim();
+
+      localStorage.setItem("user_game_id", value);
+      profile.game_id = value;
+      initialProfile.game_id = value;
+    }
+
+    // ----------------------------------------------------------
+    // SERVER ID
+    // ----------------------------------------------------------
+
+    if (data.server_id !== undefined) {
+      const value = String(data.server_id).trim();
+
+      localStorage.setItem("user_server_id", value);
+      profile.server_id = value;
+      initialProfile.server_id = value;
+    }
+
+    // ----------------------------------------------------------
+    // KELAS
+    // ----------------------------------------------------------
+
+    if (data.kelas !== undefined) {
+      const value = String(data.kelas).trim();
+
+      localStorage.setItem("kelas", value);
+      profile.kelas = value;
+      initialProfile.kelas = value;
+
+      console.log("KELAS UPDATED:", value);
+    }
+
+    // ----------------------------------------------------------
+    // TEAM
+    // ----------------------------------------------------------
+
+    profile.team = getTeamName();
+  }
+
+  // ============================================================
+  // UPDATE PASSWORD
+  // ============================================================
+
   async function updatePasswordToServer(passwordData) {
     try {
-      const response = await fetchWithAuth("/api/users/update/password", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          password: passwordData.current,
-          password_new: passwordData.new
-        }),
-        credentials: 'include'
+      const response = await fetchWithAuth(
+        "/api/users/update/password",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            password: passwordData.current,
+            password_new: passwordData.new
+          })
+        }
+      );
+
+      if (response.ok) {
+        return true;
+      }
+
+      let data = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Update Password",
+        text: data.errors || data.message || "Password saat ini salah!",
+        confirmButtonColor: "#ef4444"
       });
 
-      if (response.status === 200) {
-        return true;
-      } else {
-        const data = await response.json();
-        const errorMessage = data.errors || data.message || 'Password saat ini salah!';
-        Swal.fire({
-          icon: 'error',
-          title: 'Gagal Update Password',
-          text: errorMessage,
-          confirmButtonColor: '#ef4444'
-        });
-        return false;
-      }
+      return false;
+
     } catch (error) {
       console.error("Error updating password:", error);
+
       Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
-        confirmButtonColor: '#ef4444'
+        icon: "error",
+        title: "Error",
+        text: "Terjadi kesalahan pada server. Silakan coba lagi.",
+        confirmButtonColor: "#ef4444"
       });
+
       return false;
     }
   }
 
-  // Update wajah ke server
+  // ============================================================
+  // UPDATE FACE
+  // ============================================================
+
   async function updateFaceToServer(base64Image) {
     try {
       const blob = base64ToBlob(base64Image);
       const formData = new FormData();
-      formData.append('face', blob, 'face-register.jpg');
 
-      const response = await fetchWithAuth("/api/users/upload/face", {
-        method: "POST",
-        body: formData,
-        credentials: 'include'
+      formData.append("face", blob, "face-register.jpg");
+
+      const response = await fetchWithAuth(
+        "/api/users/upload/face",
+        {
+          method: "POST",
+          body: formData,
+          credentials: "include"
+        }
+      );
+
+      if (response.ok) {
+        return true;
+      }
+
+      let data = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Mendaftarkan Wajah",
+        text: data.errors || data.message || "Gagal mendaftarkan wajah.",
+        confirmButtonColor: "#ef4444"
       });
 
-      if (response.status === 200) {
-        return true;
-      } else {
-        const data = await response.json();
-        const errorMessage = data.errors || data.message || 'Gagal mendaftarkan wajah';
-        Swal.fire({
-          icon: 'error',
-          title: 'Gagal Mendaftarkan Wajah',
-          text: errorMessage,
-          confirmButtonColor: '#ef4444'
-        });
-        return false;
-      }
+      return false;
+
     } catch (error) {
       console.error("Error updating face:", error);
+
       Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Terjadi kesalahan pada server. Silakan coba lagi.',
-        confirmButtonColor: '#ef4444'
+        icon: "error",
+        title: "Error",
+        text: "Terjadi kesalahan pada server. Silakan coba lagi.",
+        confirmButtonColor: "#ef4444"
       });
+
       return false;
     }
   }
 
+  // ============================================================
+  // OTP INPUT
+  // ============================================================
 
   function handleOtpInput(index, event) {
-    const value = event.target.value;
-    if (!/^\d*$/.test(value)) {
-      otpCodes[index] = '';
-      otpCodes = otpCodes;
-      saveOtpState();
-      return;
-    }
+    let value = event.target.value || "";
+
+    value = value.replace(/\D/g, "");
+
     otpCodes[index] = value.slice(-1);
-    otpCodes = otpCodes;
+    otpCodes = [...otpCodes];
+
     saveOtpState();
+
     if (otpCodes[index] && index < 3) {
-      otpInputs[index + 1].focus();
+      otpInputs[index + 1]?.focus();
     }
   }
 
   function handleOtpKeydown(index, event) {
-    if (event.key === 'Backspace') {
+    if (event.key === "Backspace") {
       if (!otpCodes[index] && index > 0) {
-        otpCodes[index - 1] = '';
-        otpInputs[index - 1].focus();
+        otpCodes[index - 1] = "";
+        otpCodes = [...otpCodes];
+        otpInputs[index - 1]?.focus();
       } else {
-        otpCodes[index] = '';
+        otpCodes[index] = "";
+        otpCodes = [...otpCodes];
       }
+
+      saveOtpState();
     }
-    if (event.key === 'ArrowLeft' && index > 0) {
-      otpInputs[index - 1].focus();
+
+    if (event.key === "ArrowLeft" && index > 0) {
+      otpInputs[index - 1]?.focus();
     }
-    if (event.key === 'ArrowRight' && index < 3) {
-      otpInputs[index + 1].focus();
+
+    if (event.key === "ArrowRight" && index < 3) {
+      otpInputs[index + 1]?.focus();
     }
-    otpCodes = otpCodes;
-    saveOtpState();
   }
 
   function handleOtpPaste(event) {
     event.preventDefault();
-    const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
-    for (let i = 0; i < 4; i++) {
-      otpCodes[i] = pasted[i] || '';
-    }
-    otpCodes = otpCodes;
+
+    const pasted = event.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, 4);
+
+    otpCodes = [
+      pasted[0] || "",
+      pasted[1] || "",
+      pasted[2] || "",
+      pasted[3] || ""
+    ];
+
     saveOtpState();
-    const lastIndex = Math.min(pasted.length, 3);
-    otpInputs[lastIndex]?.focus();
+
+    const focusIndex = Math.min(pasted.length, 3);
+    otpInputs[focusIndex]?.focus();
   }
 
+  // ============================================================
+  // RESET OTP
+  // ============================================================
+
   function resetOtpModal() {
-    otpCodes = ['', '', '', ''];
+    otpCodes = ["", "", "", ""];
     isOtpModalOpen = false;
+
     pendingProfileData = null;
     pendingPasswordData = null;
     pendingFaceData = null;
+
     otpAction = null;
-    if (countdownInterval) clearInterval(countdownInterval);
+
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+
     countdown = 0;
     otpTimestamp = null;
+
     sessionStorage.removeItem("otp_modal_state");
   }
 
+  // ============================================================
+  // SAVE PROFILE
+  // ============================================================
+
   async function saveProfile() {
-    if (isSendingOtp) return;
+    if (isSendingOtp) {
+      return;
+    }
 
-    const hasNamaChange = profile.nama.trim() !== initialProfile.nama && profile.nama.trim() !== "";
-    const hasUsernameChange = profile.username.trim() !== initialProfile.username && profile.username.trim() !== "";
-    const hasEmailChange = profile.email.trim() !== initialProfile.email && profile.email.trim() !== "";
-    const hasGameIdChange = profile.game_id.trim() !== initialProfile.game_id && profile.game_id.trim() !== "";
-    const hasServerIdChange = profile.server_id.trim() !== initialProfile.server_id && profile.server_id.trim() !== "";
+    // ==========================================================
+    // NORMALIZE
+    // ==========================================================
 
-    if (!hasNamaChange && !hasUsernameChange && !hasEmailChange && !hasGameIdChange && !hasServerIdChange) {
+    profile.nama = profile.nama.trim();
+    profile.username = profile.username.trim();
+    profile.email = profile.email.trim();
+    profile.game_id = profile.game_id.trim();
+    profile.server_id = profile.server_id.trim();
+    profile.kelas = profile.kelas.trim();
+
+    // ==========================================================
+    // CHANGE CHECK
+    // ==========================================================
+
+    const hasNamaChange = profile.nama !== initialProfile.nama && profile.nama !== "";
+    const hasUsernameChange = profile.username !== initialProfile.username && profile.username !== "";
+    const hasEmailChange = profile.email !== initialProfile.email && profile.email !== "";
+    const hasGameIdChange = profile.game_id !== initialProfile.game_id && profile.game_id !== "";
+    const hasServerIdChange = profile.server_id !== initialProfile.server_id && profile.server_id !== "";
+    const hasKelasChange = profile.kelas !== initialProfile.kelas && profile.kelas !== "";
+
+    console.log("PROFILE CHANGE CHECK:", {
+      nama: hasNamaChange,
+      username: hasUsernameChange,
+      email: hasEmailChange,
+      game_id: hasGameIdChange,
+      server_id: hasServerIdChange,
+      kelas: hasKelasChange
+    });
+
+    // ==========================================================
+    // NO CHANGE
+    // ==========================================================
+
+    if (
+      !hasNamaChange &&
+      !hasUsernameChange &&
+      !hasEmailChange &&
+      !hasGameIdChange &&
+      !hasServerIdChange &&
+      !hasKelasChange
+    ) {
       Swal.fire({
         icon: "info",
         title: "Tidak Ada Perubahan",
         text: "Tidak ada data yang diubah untuk disimpan.",
         confirmButtonColor: "#0a4682"
       });
+
       return;
     }
 
-    if (hasNamaChange && !profile.nama.trim()) {
-      Swal.fire({ icon: "warning", title: "Nama tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+    // ==========================================================
+    // VALIDATION
+    // ==========================================================
+
+    if (hasNamaChange && !profile.nama) {
+      Swal.fire({
+        icon: "warning",
+        title: "Nama tidak boleh kosong!",
+        confirmButtonColor: "#0a4682"
+      });
+
       return;
     }
-    if (hasUsernameChange && !profile.username.trim()) {
-      Swal.fire({ icon: "warning", title: "Username tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+
+    if (hasUsernameChange && !profile.username) {
+      Swal.fire({
+        icon: "warning",
+        title: "Username tidak boleh kosong!",
+        confirmButtonColor: "#0a4682"
+      });
+
       return;
     }
-    if (hasEmailChange && !profile.email.trim()) {
-      Swal.fire({ icon: "warning", title: "Email tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+
+    if (hasEmailChange && !profile.email) {
+      Swal.fire({
+        icon: "warning",
+        title: "Email tidak boleh kosong!",
+        confirmButtonColor: "#0a4682"
+      });
+
       return;
     }
-    if (hasGameIdChange && !profile.game_id.trim()) {
-      Swal.fire({ icon: "warning", title: "Game ID tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+
+    if (hasGameIdChange && !profile.game_id) {
+      Swal.fire({
+        icon: "warning",
+        title: "Game ID tidak boleh kosong!",
+        confirmButtonColor: "#0a4682"
+      });
+
       return;
     }
-    if (hasServerIdChange && !profile.server_id.trim()) {
-      Swal.fire({ icon: "warning", title: "Server ID tidak boleh kosong!", confirmButtonColor: "#0a4682" });
+
+    if (hasServerIdChange && !profile.server_id) {
+      Swal.fire({
+        icon: "warning",
+        title: "Server ID tidak boleh kosong!",
+        confirmButtonColor: "#0a4682"
+      });
+
       return;
     }
+
+    if (hasKelasChange && !profile.kelas) {
+      Swal.fire({
+        icon: "warning",
+        title: "Kelas tidak boleh kosong!",
+        confirmButtonColor: "#0a4682"
+      });
+
+      return;
+    }
+
+    // ==========================================================
+    // PENDING DATA
+    // ==========================================================
 
     pendingProfileData = {
       nama: profile.nama,
       username: profile.username,
       email: profile.email,
       game_id: profile.game_id,
-      server_id: profile.server_id
+      server_id: profile.server_id,
+      kelas: profile.kelas
     };
-    otpAction = 'profile';
+
+    console.log("PENDING PROFILE:", pendingProfileData);
+
+    otpAction = "profile";
+
+    // ==========================================================
+    // SEND OTP
+    // ==========================================================
 
     const otpSent = await sendOtpEmail();
-    if (otpSent) {
-      otpCodes = ['', '', '', ''];
-      isOtpModalOpen = true;
-      saveOtpState();
 
-      setTimeout(() => {
-        if (otpInputs[0]) otpInputs[0].focus();
-      }, 100);
+    if (!otpSent) {
+      return;
     }
+
+    otpCodes = ["", "", "", ""];
+    isOtpModalOpen = true;
+
+    saveOtpState();
+
+    setTimeout(() => {
+      otpInputs[0]?.focus();
+    }, 100);
   }
+
+  // ============================================================
+  // SAVE PASSWORD
+  // ============================================================
 
   async function savePassword() {
-    if (isSendingOtp) return;
-    if (!password.current || !password.new || !password.confirm) {
-      Swal.fire({ icon: "warning", title: "Lengkapi semua field!", confirmButtonColor: "#0a4682" });
-      return;
-    }
-    if (password.new !== password.confirm) {
-      Swal.fire({ icon: "error", title: "Password baru tidak cocok!", confirmButtonColor: "#0a4682" });
-      return;
-    }
-    if (password.new.length < 6) {
-      Swal.fire({ icon: "error", title: "Password minimal 6 karakter!", confirmButtonColor: "#0a4682" });
+    if (isSendingOtp) {
       return;
     }
 
-    isSendingOtp = true;
-    try {
-      const checkResponse = await fetchWithAuth("/api/users/check-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: password.current }),
-        credentials: 'include'
+    if (!password.current || !password.new || !password.confirm) {
+      Swal.fire({
+        icon: "warning",
+        title: "Lengkapi semua field!",
+        confirmButtonColor: "#0a4682"
       });
 
-      if (checkResponse.status !== 200) {
-        const checkData = await checkResponse.json();
+      return;
+    }
+
+    if (password.new !== password.confirm) {
+      Swal.fire({
+        icon: "error",
+        title: "Password baru tidak cocok!",
+        confirmButtonColor: "#0a4682"
+      });
+
+      return;
+    }
+
+    if (password.new.length < 6) {
+      Swal.fire({
+        icon: "error",
+        title: "Password minimal 6 karakter!",
+        confirmButtonColor: "#0a4682"
+      });
+
+      return;
+    }
+
+    try {
+      isSendingOtp = true;
+
+      const checkResponse = await fetchWithAuth(
+        "/api/users/check-password",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify({ password: password.current })
+        }
+      );
+
+      if (!checkResponse.ok) {
+        let checkData = {};
+
+        try {
+          checkData = await checkResponse.json();
+        } catch {
+          checkData = {};
+        }
+
         Swal.fire({
-          icon: 'error',
-          title: 'Gagal',
-          text: checkData.errors || checkData.message || 'Password saat ini yang Anda masukkan salah!',
-          confirmButtonColor: '#ef4444'
+          icon: "error",
+          title: "Gagal",
+          text: checkData.errors || checkData.message || "Password saat ini salah!",
+          confirmButtonColor: "#ef4444"
         });
-        isSendingOtp = false;
+
         return;
       }
-    } catch (err) {
-      console.error("Error checking password:", err);
+
+      pendingPasswordData = {
+        current: password.current,
+        new: password.new
+      };
+
+      otpAction = "password";
+
+    } catch (error) {
+      console.error("Error checking password:", error);
+
       Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Gagal memverifikasi password. Silakan coba lagi.',
-        confirmButtonColor: '#ef4444'
+        icon: "error",
+        title: "Error",
+        text: "Gagal memverifikasi password.",
+        confirmButtonColor: "#ef4444"
       });
+
+      return;
+
+    } finally {
       isSendingOtp = false;
+    }
+
+    const otpSent = await sendOtpEmail();
+
+    if (!otpSent) {
       return;
     }
 
-    pendingPasswordData = {
-      current: password.current,
-      new: password.new
-    };
-    otpAction = 'password';
+    otpCodes = ["", "", "", ""];
+    isOtpModalOpen = true;
 
-    const otpSent = await sendOtpEmail();
-    if (otpSent) {
-      otpCodes = ['', '', '', ''];
-      isOtpModalOpen = true;
-      saveOtpState();
+    saveOtpState();
 
-      setTimeout(() => {
-        if (otpInputs[0]) otpInputs[0].focus();
-      }, 100);
-    }
+    setTimeout(() => {
+      otpInputs[0]?.focus();
+    }, 100);
   }
+
+  // ============================================================
+  // SAVE FACE
+  // ============================================================
 
   async function saveFace() {
-    if (isSendingOtp) return;
-
-    if (!faceCameraReady) {
-      Swal.fire({ icon: "warning", title: "Kamera belum siap!", confirmButtonColor: "#0a4682" });
+    if (isSendingOtp) {
       return;
     }
 
-    const captured = await captureFaceBase64();
-    pendingFaceData = captured;
-    otpAction = 'face';
+    if (!faceCameraReady) {
+      Swal.fire({
+        icon: "warning",
+        title: "Kamera belum siap!",
+        confirmButtonColor: "#0a4682"
+      });
 
-    const otpSent = await sendOtpEmail();
-    if (otpSent) {
-      otpCodes = ['', '', '', ''];
+      return;
+    }
+
+    try {
+      const captured = await captureFaceBase64();
+
+      pendingFaceData = captured;
+      otpAction = "face";
+
+      const otpSent = await sendOtpEmail();
+
+      if (!otpSent) {
+        return;
+      }
+
+      otpCodes = ["", "", "", ""];
       isOtpModalOpen = true;
+
       saveOtpState();
 
       setTimeout(() => {
-        if (otpInputs[0]) otpInputs[0].focus();
+        otpInputs[0]?.focus();
       }, 100);
+
+    } catch (error) {
+      console.error("Error capturing face:", error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: "Gagal mengambil gambar wajah.",
+        confirmButtonColor: "#ef4444"
+      });
     }
   }
 
+  // ============================================================
+  // VERIFY OTP HANDLER
+  // ============================================================
+
   async function handleVerifyOtp() {
-    const otpCode = otpCodes.join('');
+    const otpCode = otpCodes.join("");
 
     if (otpCode.length !== 4) {
       Swal.fire({
-        icon: 'warning',
-        title: 'Kode Tidak Lengkap',
-        text: 'Masukkan 4 digit kode verifikasi',
-        confirmButtonColor: '#0b5ba2'
+        icon: "warning",
+        title: "Kode Tidak Lengkap",
+        text: "Masukkan 4 digit kode verifikasi.",
+        confirmButtonColor: "#0b5ba2"
       });
+
+      return;
+    }
+
+    if (isLoadingOtp) {
       return;
     }
 
@@ -758,164 +1466,239 @@
       const isValid = await verifyOtp(otpCode);
 
       if (!isValid) {
-        otpCodes = ['', '', '', ''];
+        otpCodes = ["", "", "", ""];
         otpInputs[0]?.focus();
-        isLoadingOtp = false;
         return;
       }
 
       let updateSuccess = false;
 
-      if (otpAction === 'profile') {
+      // ========================================================
+      // PROFILE
+      // ========================================================
+
+      if (otpAction === "profile") {
         updateSuccess = await updateProfileToServer(pendingProfileData);
-        if (updateSuccess) {
-          if (pendingProfileData.nama) {
-            currentUserName = pendingProfileData.nama;
-          }
-        }
-      } else if (otpAction === 'password') {
+      }
+
+      // ========================================================
+      // PASSWORD
+      // ========================================================
+
+      else if (otpAction === "password") {
         updateSuccess = await updatePasswordToServer(pendingPasswordData);
+
         if (updateSuccess) {
-          password = { current: "", new: "", confirm: "" };
+          password = {
+            current: "",
+            new: "",
+            confirm: ""
+          };
         }
-      } else if (otpAction === 'face') {
+      }
+
+      // ========================================================
+      // FACE
+      // ========================================================
+
+      else if (otpAction === "face") {
         updateSuccess = await updateFaceToServer(pendingFaceData);
+
         if (updateSuccess) {
           stopFaceCamera();
           pendingFaceData = null;
         }
       }
 
+      // ========================================================
+      // SUCCESS
+      // ========================================================
+
       if (updateSuccess) {
+        const action = otpAction;
+
         resetOtpModal();
-        localStorage.clear();
-        sessionStorage.clear();
 
         Swal.fire({
           icon: "success",
-          title: otpAction === 'profile'
+          title: action === "profile"
             ? "Profil berhasil diperbarui!"
-            : otpAction === 'password'
+            : action === "password"
               ? "Password berhasil diubah!"
               : "Wajah berhasil didaftarkan!",
-          text: "Data Anda telah diperbarui. Silakan login kembali dengan data baru Anda.",
+          text: "Data Anda telah diperbarui.",
           confirmButtonColor: "#0a4682",
           confirmButtonText: "Login Kembali"
         }).then(() => {
-          push('/signin');
+          localStorage.clear();
+          sessionStorage.clear();
+          push("/signin");
         });
       }
 
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error handle verify:", error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Terjadi kesalahan saat memproses data.",
+        confirmButtonColor: "#ef4444"
+      });
+
     } finally {
       isLoadingOtp = false;
     }
   }
 
-  function resendOtp() {
+  // ============================================================
+  // RESEND OTP
+  // ============================================================
+
+  async function resendOtp() {
     if (countdown > 0) {
       Swal.fire({
-        icon: 'warning',
-        title: 'Tunggu Sebentar',
-        text: `Silakan tunggu ${countdown} detik sebelum meminta ulang OTP`,
-        confirmButtonColor: '#0b5ba2'
+        icon: "warning",
+        title: "Tunggu Sebentar",
+        text: `Silakan tunggu ${countdown} detik sebelum meminta ulang OTP.`,
+        confirmButtonColor: "#0b5ba2"
       });
+
       return;
     }
-    sendOtpEmail();
+
+    await sendOtpEmail();
   }
+
+  // ============================================================
+  // LOGOUT
+  // ============================================================
 
   function handleLogout() {
     Swal.fire({
-      title: "Yakin ingin keluar?", icon: "warning", showCancelButton: true,
-      confirmButtonColor: "#ef4444", cancelButtonColor: "#9ca3af", confirmButtonText: "Ya, Logout!",
-    }).then((r) => { if (r.isConfirmed) {
-      localStorage.clear();
-      push("/")
-
-    } });
+      title: "Yakin ingin keluar?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#9ca3af",
+      confirmButtonText: "Ya, Logout!"
+    }).then((result) => {
+      if (result.isConfirmed) {
+        localStorage.clear();
+        sessionStorage.clear();
+        push("/");
+      }
+    });
   }
 
-  let innerWidth = 0;
-  let isSidebarOpen = true;
-  $: if (innerWidth > 0 && innerWidth < 768) { isSidebarOpen = false; } else if (innerWidth >= 768) { isSidebarOpen = true; }
-  function toggleSidebar() { isSidebarOpen = !isSidebarOpen; }
+  // ============================================================
+  // SIDEBAR
+  // ============================================================
 
-  let isDropdownOpen = false;
-  function toggleDropdown() { isDropdownOpen = !isDropdownOpen; }
-  function closeDropdown() { isDropdownOpen = false; }
+  $: if (innerWidth > 0 && innerWidth < 768) {
+    isSidebarOpen = false;
+  } else if (innerWidth >= 768) {
+    isSidebarOpen = true;
+  }
 
-  const tabs = [
-    { id: "profile", label: "Profil", icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
-    { id: "password", label: "Keamanan", icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" },
-    { id: "face", label: "Wajah", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
-  ];
+  function toggleSidebar() {
+    isSidebarOpen = !isSidebarOpen;
+  }
 
-  // Profile Picture variables & handlers
-  let userPfp = "";
-  let isCropModalOpen = false;
-  let imageSrc = "";
-  let scale = 1;
-  let posX = 0;
-  let posY = 0;
-  let isDragging = false;
-  let startX = 0;
-  let startY = 0;
-  let canvasEl;
-  let isUploadingPfp = false;
+  // ============================================================
+  // DROPDOWN
+  // ============================================================
+
+  function toggleDropdown() {
+    isDropdownOpen = !isDropdownOpen;
+  }
+
+  function closeDropdown() {
+    isDropdownOpen = false;
+  }
+
+  // ============================================================
+  // PROFILE PICTURE INPUT
+  // ============================================================
 
   function triggerFileInput() {
     const input = document.getElementById("pfp-input");
-    if (input) input.click();
+    input?.click();
   }
 
   function handleFileSelect(e) {
-    const file = e.target.files[0];
-    if (file) {
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
-      if (!allowedTypes.includes(file.type)) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'Format Tidak Didukung',
-          text: 'Silakan upload file JPG, PNG, GIF, atau WebP',
-          confirmButtonColor: '#0b5ba2'
-        });
-        e.target.value = '';
-        return;
-      }
+    const file = e.target.files?.[0];
 
-      if (file.size > 2 * 1024 * 1024) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'Ukuran Terlalu Besar',
-          text: 'Maksimal ukuran file adalah 2MB',
-          confirmButtonColor: '#0b5ba2'
-        });
-        e.target.value = '';
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        imageSrc = event.target.result;
-        isCropModalOpen = true;
-        scale = 1;
-        posX = 0;
-        posY = 0;
-        setTimeout(drawCanvas, 100);
-      };
-      reader.readAsDataURL(file);
+    if (!file) {
+      return;
     }
+
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/jpg",
+      "image/gif",
+      "image/webp"
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      Swal.fire({
+        icon: "warning",
+        title: "Format Tidak Didukung",
+        text: "Silakan upload file JPG, PNG, GIF, atau WebP.",
+        confirmButtonColor: "#0b5ba2"
+      });
+
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      Swal.fire({
+        icon: "warning",
+        title: "Ukuran Terlalu Besar",
+        text: "Maksimal ukuran file adalah 2MB.",
+        confirmButtonColor: "#0b5ba2"
+      });
+
+      e.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      imageSrc = event.target.result;
+      isCropModalOpen = true;
+      scale = 1;
+      posX = 0;
+      posY = 0;
+
+      setTimeout(() => {
+        drawCanvas();
+      }, 100);
+    };
+
+    reader.readAsDataURL(file);
   }
 
+  // ============================================================
+  // DRAW CROP CANVAS
+  // ============================================================
+
   function drawCanvas() {
-    if (!canvasEl || !imageSrc) return;
+    if (!canvasEl || !imageSrc) {
+      return;
+    }
+
     const ctx = canvasEl.getContext("2d");
     const img = new Image();
+
     img.src = imageSrc;
+
     img.onload = () => {
       ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
       ctx.fillStyle = "#f3f4f6";
       ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
 
@@ -923,24 +1706,38 @@
       const initScale = 200 / baseSize;
       const drawWidth = img.width * initScale * scale;
       const drawHeight = img.height * initScale * scale;
+      const x = 150 - drawWidth / 2 + posX;
+      const y = 150 - drawHeight / 2 + posY;
 
-      const x = (150 - drawWidth / 2) + posX;
-      const y = (150 - drawHeight / 2) + posY;
+      // --------------------------------------------------------
+      // BACKGROUND
+      // --------------------------------------------------------
 
       ctx.save();
       ctx.filter = "blur(8px) brightness(0.65)";
       ctx.drawImage(img, x, y, drawWidth, drawHeight);
       ctx.restore();
 
+      // --------------------------------------------------------
+      // CIRCLE
+      // --------------------------------------------------------
+
       ctx.save();
       ctx.beginPath();
       ctx.arc(150, 150, 100, 0, Math.PI * 2);
       ctx.clip();
+
       ctx.fillStyle = "#fafafa";
       ctx.fillRect(50, 50, 200, 200);
+
       ctx.filter = "none";
       ctx.drawImage(img, x, y, drawWidth, drawHeight);
+
       ctx.restore();
+
+      // --------------------------------------------------------
+      // BORDER
+      // --------------------------------------------------------
 
       ctx.beginPath();
       ctx.arc(150, 150, 100, 0, Math.PI * 2);
@@ -950,15 +1747,25 @@
     };
   }
 
+  // ============================================================
+  // MOUSE CROP
+  // ============================================================
+
   function handleMouseDown(e) {
-    if (!isCropModalOpen) return;
+    if (!isCropModalOpen) {
+      return;
+    }
+
     isDragging = true;
     startX = e.clientX - posX;
     startY = e.clientY - posY;
   }
 
   function handleMouseMove(e) {
-    if (!isDragging) return;
+    if (!isDragging) {
+      return;
+    }
+
     posX = e.clientX - startX;
     posY = e.clientY - startY;
     drawCanvas();
@@ -968,16 +1775,27 @@
     isDragging = false;
   }
 
+  // ============================================================
+  // TOUCH CROP
+  // ============================================================
+
   function handleTouchStart(e) {
-    if (!isCropModalOpen || e.touches.length === 0) return;
+    if (!isCropModalOpen || e.touches.length === 0) {
+      return;
+    }
+
     isDragging = true;
     startX = e.touches[0].clientX - posX;
     startY = e.touches[0].clientY - posY;
   }
 
   function handleTouchMove(e) {
-    if (!isDragging || e.touches.length === 0) return;
+    if (!isDragging || e.touches.length === 0) {
+      return;
+    }
+
     e.preventDefault();
+
     posX = e.touches[0].clientX - startX;
     posY = e.touches[0].clientY - startY;
     drawCanvas();
@@ -992,8 +1810,14 @@
     drawCanvas();
   }
 
+  // ============================================================
+  // UPLOAD PROFILE PICTURE
+  // ============================================================
+
   async function uploadPfp() {
-    if (!canvasEl || !imageSrc) return;
+    if (!canvasEl || !imageSrc) {
+      return;
+    }
 
     isUploadingPfp = true;
 
@@ -1001,6 +1825,7 @@
       const outputCanvas = document.createElement("canvas");
       outputCanvas.width = 200;
       outputCanvas.height = 200;
+
       const oCtx = outputCanvas.getContext("2d");
       oCtx.fillStyle = "#ffffff";
       oCtx.fillRect(0, 0, 200, 200);
@@ -1008,9 +1833,10 @@
       const img = new Image();
       img.src = imageSrc;
 
-      await new Promise((resolve) => {
+      await new Promise((resolve, reject) => {
         img.onload = () => {
           oCtx.save();
+
           oCtx.beginPath();
           oCtx.arc(100, 100, 100, 0, Math.PI * 2);
           oCtx.clip();
@@ -1019,47 +1845,65 @@
           const initScale = 200 / baseSize;
           const drawWidth = img.width * initScale * scale;
           const drawHeight = img.height * initScale * scale;
-          const x = (100 - drawWidth / 2) + posX;
-          const y = (100 - drawHeight / 2) + posY;
+          const x = 100 - drawWidth / 2 + posX;
+          const y = 100 - drawHeight / 2 + posY;
 
           oCtx.drawImage(img, x, y, drawWidth, drawHeight);
           oCtx.restore();
+
           resolve();
+        };
+
+        img.onerror = () => {
+          reject(new Error("Gagal membaca gambar."));
         };
       });
 
-      const blob = await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/jpeg', 0.9));
+      const blob = await new Promise((resolve) => {
+        outputCanvas.toBlob(resolve, "image/jpeg", 0.9);
+      });
+
+      if (!blob) {
+        throw new Error("Gagal membuat file gambar.");
+      }
 
       const formData = new FormData();
-      formData.append('avatar', blob, 'pfp.jpg');
+      formData.append("avatar", blob, "pfp.jpg");
 
       Swal.fire({
-        title: 'Mengupload foto...',
-        text: 'Mohon tunggu sebentar',
+        title: "Mengupload foto...",
+        text: "Mohon tunggu sebentar",
         allowOutsideClick: false,
         didOpen: () => {
           Swal.showLoading();
         }
       });
 
-      const response = await fetch("/api/users/upload/pfp", {
-        method: "PATCH",
-        body: formData,
-        credentials: 'include'
-      });
+      const response = await fetchWithAuth(
+        "/api/users/upload/pfp",
+        {
+          method: "PATCH",
+          body: formData,
+          credentials: "include"
+        }
+      );
 
-      const result = await response.json();
+      let result = {};
+
+      try {
+        result = await response.json();
+      } catch {
+        result = {};
+      }
 
       Swal.close();
 
-      if (response.status === 200) {
-        const pfpFilename = result.data?.pfp
+      if (response.ok) {
+        const pfpFilename = result.data?.pfp;
 
         if (pfpFilename) {
           localStorage.setItem("user_avatar", pfpFilename);
-          const timestamp = Date.now();
-          userPfp = `/avatar/${pfpFilename}?t=${timestamp}`;
-          userPfp = userPfp;
+          userPfp = `/avatar/${pfpFilename}?t=${Date.now()}`;
         }
 
         isCropModalOpen = false;
@@ -1072,22 +1916,28 @@
           timer: 1500,
           showConfirmButton: false
         });
+
       } else {
         Swal.fire({
           icon: "error",
           title: "Gagal!",
-          text: result.message || "Gagal mengupload foto profil.",
+          text: result.message || result.errors || "Gagal mengupload foto profil.",
           confirmButtonColor: "#ef4444"
         });
       }
+
     } catch (error) {
       console.error("Error uploading pfp:", error);
+
+      Swal.close();
+
       Swal.fire({
         icon: "error",
         title: "Error!",
         text: "Terjadi kesalahan saat mengupload foto.",
         confirmButtonColor: "#ef4444"
       });
+
     } finally {
       isUploadingPfp = false;
     }
@@ -1258,6 +2108,12 @@
                   <label for="role" class="block mb-1.5 text-sm font-semibold text-gray-700">Role</label>
                   <input id="role" type="text" value={profile.role} disabled
                     class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
+                </div>
+
+                <div>
+                  <label for="kelas" class="block mb-1.5 text-sm font-semibold text-gray-700">Kelas</label>
+                  <input id="kelas" type="text" bind:value={profile.kelas} 
+                    class="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg outline-none transition-all {hasTeam() ? 'focus:ring-2 focus:ring-[#0a4682] focus:border-[#0a4682]' : 'focus:ring-2 focus:ring-red-500 focus:border-red-500'}"/>
                 </div>
               </div>
 
