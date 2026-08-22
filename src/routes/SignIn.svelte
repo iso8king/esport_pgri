@@ -112,10 +112,10 @@
     localStorage.setItem("role", data.data.role);
     localStorage.setItem("email", data.data.email);
     localStorage.setItem("status", data.data.status);
-    localStorage.setItem("tim", data.data.tim);
+    localStorage.setItem("tim", data.data.member?.team?.nama_tim);
     localStorage.setItem("akun_dibuat", data.data.akun_dibuat);
     localStorage.setItem("user_avatar", data.data.pfp);
-    localStorage.setItem("kelas", data.data.kelas)
+    localStorage.setItem("kelas", data.data.kelas || "")
 
     stopCamera();
 
@@ -247,7 +247,7 @@
 
       <!-- Email selalu tampil, dipakai kedua metode -->
       <div class="px-6 pt-5 space-y-2">
-        <label for="email" class="block text-sm font-semibold text-gray-700">Email</label>
+        <label for="email" class="block text-sm font-semibold text-gray-700">Email / Username</label>
         <input
           id="email"
           type="text"
