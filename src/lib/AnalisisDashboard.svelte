@@ -3,7 +3,7 @@
   import Swal from "sweetalert2";
 
   // API Config
-  const API_URL = "https://arena.rone.dev/api";
+  const API_URL = "https://arena-hv.fastapicloud.dev/api";
 
   // Tab State
   let activeTab = "meta"; // "meta" | "counter" | "synergy" | "match"
