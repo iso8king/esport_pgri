@@ -3,7 +3,7 @@
   import Swal from "sweetalert2";
 
   // API Config
-  const API_URL = "https://openmlbb.fastapicloud.dev/api";
+  const API_URL = "https://arena.rone.dev/api";
 
   // Tab State
   let activeTab = "meta"; // "meta" | "counter" | "synergy" | "match"
@@ -817,15 +817,13 @@
 <div class="space-y-8 max-w-[1440px] w-full mx-auto">
   
   <!-- Banner Header -->
-  <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0a2e52] to-[#164e87] text-white p-8 shadow-lg border border-white/10">
+  <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0a2e52] to-[#164e87] text-white p-12 shadow-lg border border-white/10">
     <div class="absolute -right-16 -top-16 w-48 h-48 bg-white/5 rounded-full blur-2xl"></div>
     <div class="relative z-10 space-y-2">
-      <div class="flex items-center gap-2">
-        <span class="px-2.5 py-0.5 text-xs font-bold text-cyan-200 bg-cyan-950/50 border border-cyan-800/50 rounded-full uppercase tracking-wider">SMEGIONE ANALISIS</span>
-      </div>
+      
       <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">Dashboard Analisis MLBB</h1>
       <p class="text-sm md:text-base text-zinc-200 max-w-2xl leading-relaxed">
-        Analisis data statistik hero, counter-pick, sinergi tim, serta performa pertandingan secara riil.
+        Analisis data statistik hero, counter-pick, sinergi tim, serta performa pertandingan.
       </p>
     </div>
   </div>
