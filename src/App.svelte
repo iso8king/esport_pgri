@@ -2,6 +2,7 @@
     import Router from 'svelte-spa-router';
     import Dashboard from './routes/Dashboard.svelte';
     import Home from './routes/Home.svelte';
+    import Hub from './routes/Hub.svelte';
     import Admin from './routes/Admin/Admin.svelte';
     import Admin_anggota from './routes/Admin/Admin_anggota.svelte';
     import Admin_absensi from './routes/Admin/Admin_absensi.svelte';
@@ -53,6 +54,7 @@
         '/user/kegiatan': User_kegiatan,
         '/user/settings': User_setting,
         '/user/analisis': User_analisis,
+        '/hub' : Hub
 
         //'/user': Home,
         //'/admin': Admin,
