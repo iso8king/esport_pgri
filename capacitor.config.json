@@ -1,0 +1,9 @@
+{
+  "appId": "com.smegione.app",
+  "appName": "smegione-esport",
+  "webDir": "dist",
+  "server" : {
+    "url" : "https://smegionesport.my.id/",
+    "clearText" : false
+  }
+}
