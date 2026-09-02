@@ -3,9 +3,13 @@
   import { onMount } from "svelte";
   import Swal from "sweetalert2";
   import { fetchWithAuth } from "$lib/auth.js";
+  import { Capacitor } from "@capacitor/core";
+  import { Filesystem, Directory } from "@capacitor/filesystem";
+  import { Share } from "@capacitor/share";
 
   let jadwalList = [];
   let isLoading = true;
+  let isExporting = false;
 
   // ============================================================
   // PAGINATION STATE
@@ -470,6 +474,88 @@
     });
   }
 
+  // ============================================================
+  // EXPORT JADWAL (GET /api/kegiatan/export -> file blob)
+  // Support browser biasa (anchor download) & app Capacitor
+  // (Filesystem + Share, karena WebView gak punya download manager)
+  // ============================================================
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function getFilenameFromResponse(response, fallback) {
+    const disposition = response.headers.get("Content-Disposition");
+    if (disposition) {
+      const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+      if (match && match[1]) {
+        return decodeURIComponent(match[1]);
+      }
+    }
+    return fallback;
+  }
+
+  async function exportJadwal() {
+    if (isExporting) return;
+    isExporting = true;
+
+    try {
+      const response = await fetchWithAuth(`/api/absen/export`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Export gagal (status ${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const defaultName = `jadwal-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = getFilenameFromResponse(response, defaultName);
+
+      if (Capacitor.isNativePlatform()) {
+        // ---- Jalan di dalam app (Android/iOS) ----
+        const base64Data = await blobToBase64(blob);
+
+        const result = await Filesystem.writeFile({
+          path: filename,
+          data: base64Data,
+          directory: Directory.Documents,
+        });
+
+        await Share.share({
+          title: filename,
+          url: result.uri,
+          dialogTitle: "Simpan atau bagikan file jadwal",
+        });
+      } else {
+        // ---- Jalan di browser biasa ----
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error("Export error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal Export",
+        text: error.message || "Terjadi kesalahan saat mengekspor data.",
+        confirmButtonColor: "#0a4682",
+      });
+    } finally {
+      isExporting = false;
+    }
+  }
+
   let currentUserName = "Loading...";
 
   onMount(() => {
@@ -782,15 +868,33 @@ HTML TEMPLATE
         <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-2xl">
           <div class="px-4 py-5 flex items-center justify-between border-b border-gray-100 sm:px-6">
             <h3 class="text-lg font-bold text-gray-800">Jadwal</h3>
-            <button
-              on:click={openModal}
-              class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] hover:shadow-lg active:scale-95"
-            >
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              Buat Jadwal
-            </button>
+            <div class="flex items-center gap-2">
+              <button
+                on:click={exportJadwal}
+                disabled={isExporting}
+                class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-[#0a4682] transition-all bg-white border border-[#0a4682] rounded-lg shadow-sm hover:bg-blue-50 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {#if isExporting}
+                  <div class="w-4 h-4 border-2 border-[#0a4682] border-t-transparent rounded-full animate-spin"></div>
+                  Mengekspor...
+                {:else}
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" />
+                  </svg>
+                  Export
+                {/if}
+              </button>
+
+              <button
+                on:click={openModal}
+                class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white transition-all bg-[#0a4682] rounded-lg shadow-md hover:bg-[#0c5599] hover:shadow-lg active:scale-95"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Buat Jadwal
+              </button>
+            </div>
           </div>
 
           {#if isLoading}
