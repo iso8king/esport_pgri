@@ -40,7 +40,7 @@
     }
 
     isLoading = false;
-    fetchThreads();
+    fetchThreads(1);
   });
 
   function handleLogout() {
@@ -65,7 +65,10 @@
   /** @type {'list' | 'detail'} */
   let threadView = "list";
 
-  let isLoadingThreads = true;
+  let isLoadingThreads = true; // loading awal (page 1)
+  let isLoadingMore = false; // loading pas nambah page berikutnya
+  let hasMoreThreads = true;
+  let currentPage = 1;
   let threads = [];
   let activeThread = null;
 
@@ -78,11 +81,25 @@
   // reply state
   let replyContent = "";
   let isSubmittingReply = false;
+  let isLoadingReplies = false; // loading awal replies (page 1) pas buka thread
+  let isLoadingMoreReplies = false; // loading pas nambah page reply berikutnya
+  let hasMoreReplies = true;
+  let currentReplyPage = 1;
 
-  async function fetchThreads() {
-    isLoadingThreads = true;
+  // ref ke elemen <main> yang scrollable, buat dengerin event scroll
+  let mainEl;
+
+  async function fetchThreads(page = 1) {
+    if (page === 1) {
+      isLoadingThreads = true;
+    } else {
+      isLoadingMore = true;
+    }
+
     try {
-      const res = await fetch("/api/hub/threads", { credentials: "include" });
+      const res = await fetch(`/api/hub/threads?page=${page}`, {
+        credentials: "include",
+      });
 
       if (!res.ok) {
         throw new Error(`Gagal fetch threads: ${res.status}`);
@@ -90,19 +107,54 @@
 
       const json = await res.json();
       const rawThreads = json.data?.data || [];
+      const paging = json.data?.paging || {};
 
-      threads = rawThreads.map(normalizeThread);
+      const mapped = rawThreads.map(normalizeThread);
+
+      threads = page === 1 ? mapped : [...threads, ...mapped];
+      currentPage = paging.page || page;
+
+      const totalPage = paging.totalPage || 1;
+      hasMoreThreads = currentPage < totalPage;
     } catch (e) {
       console.error("Gagal ambil thread:", e);
-      threads = [];
-      Swal.fire({
-        icon: "error",
-        title: "Gagal memuat thread",
-        text: "Coba refresh halaman ini.",
-        confirmButtonColor: "#0a4682",
-      });
+      if (page === 1) {
+        threads = [];
+        Swal.fire({
+          icon: "error",
+          title: "Gagal memuat thread",
+          text: "Coba refresh halaman ini.",
+          confirmButtonColor: "#0a4682",
+        });
+      }
+      hasMoreThreads = false;
     } finally {
       isLoadingThreads = false;
+      isLoadingMore = false;
+    }
+  }
+
+  function loadMoreThreads() {
+    if (isLoadingMore || isLoadingThreads || !hasMoreThreads) return;
+    fetchThreads(currentPage + 1);
+  }
+
+  // Dipanggil tiap kali <main> di-scroll. Kalau posisi scroll udah
+  // mepet bawah (300px sebelum benar-benar bawah), auto load page berikutnya.
+  // Berlaku buat list thread MAUPUN list reply di dalam detail thread.
+  function handleScroll(event) {
+    if (activeTab !== "thread") return;
+
+    const el = event.target;
+    const distanceToBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight;
+
+    if (distanceToBottom >= 300) return;
+
+    if (threadView === "list") {
+      loadMoreThreads();
+    } else if (threadView === "detail") {
+      loadMoreReplies();
     }
   }
 
@@ -149,8 +201,13 @@
     threadView = "detail";
     activeThread = { ...thread, replies: [] };
 
+    // reset pagination reply tiap kali buka thread baru
+    currentReplyPage = 1;
+    hasMoreReplies = true;
+    isLoadingReplies = true;
+
     try {
-      const res = await fetch(`/api/hub/threads/${thread.id}`, {
+      const res = await fetch(`/api/hub/threads/${thread.id}?page=1`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error(`Gagal fetch detail thread: ${res.status}`);
@@ -158,9 +215,17 @@
       const json = await res.json();
       const rawThread = json.data?.thread;
       const rawReplies = json.data?.replies || [];
+      const pagingReplies = json.data?.pagingReplies || {};
 
       activeThread = normalizeThread(rawThread);
       activeThread.replies = rawReplies.map(normalizeReply);
+
+      currentReplyPage = pagingReplies.page || 1;
+
+      // NOTE: pagingReplies.totalItems/totalPage dari backend keliatan buggy
+      // (cuma ngitung item di page ini, bukan total beneran di DB).
+      // Jadi pakai thread._count.replies sebagai acuan total yang akurat.
+      hasMoreReplies = activeThread.replies.length < activeThread.replyCount;
     } catch (e) {
       console.error("Gagal buka thread:", e);
       Swal.fire({
@@ -169,6 +234,56 @@
         confirmButtonColor: "#0a4682",
       });
       threadView = "list";
+    } finally {
+      isLoadingReplies = false;
+    }
+  }
+
+  async function loadMoreReplies() {
+    if (
+      isLoadingMoreReplies ||
+      isLoadingReplies ||
+      !hasMoreReplies ||
+      !activeThread
+    )
+      return;
+
+    isLoadingMoreReplies = true;
+    const nextPage = currentReplyPage + 1;
+
+    try {
+      const res = await fetch(
+        `/api/hub/threads/${activeThread.id}?page=${nextPage}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error(`Gagal fetch replies: ${res.status}`);
+
+      const json = await res.json();
+      const rawReplies = json.data?.replies || [];
+      const pagingReplies = json.data?.pagingReplies || {};
+
+      activeThread.replies = [
+        ...activeThread.replies,
+        ...rawReplies.map(normalizeReply),
+      ];
+      activeThread = { ...activeThread };
+
+      currentReplyPage = pagingReplies.page || nextPage;
+
+      // Sama kayak di openThread: pakai _count.replies (activeThread.replyCount)
+      // sebagai acuan total yang akurat, bukan pagingReplies yang buggy.
+      hasMoreReplies = activeThread.replies.length < activeThread.replyCount;
+
+      // Safety: kalau backend gak balikin reply baru sama sekali padahal
+      // hasMoreReplies masih true, paksa stop biar gak infinite loop nge-fetch.
+      if (rawReplies.length === 0) {
+        hasMoreReplies = false;
+      }
+    } catch (e) {
+      console.error("Gagal load more replies:", e);
+      hasMoreReplies = false;
+    } finally {
+      isLoadingMoreReplies = false;
     }
   }
 
@@ -429,7 +544,11 @@ async function toggleReplyLike(reply) {
         {userAvatar}
         title="SmegioneHub"
       />
-      <main class="flex-1 overflow-y-auto bg-[#fbfcfd]">
+      <main
+        bind:this={mainEl}
+        on:scroll={handleScroll}
+        class="flex-1 overflow-y-auto bg-[#fbfcfd]"
+      >
         <div class="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
           <h1 class="text-2xl font-extrabold text-[#0b355b] mb-1">
             SmegioneHub
@@ -590,6 +709,21 @@ async function toggleReplyLike(reply) {
                     </button>
                   {/each}
                 </div>
+
+                <!-- ============================================================
+                INFINITE SCROLL: indikator loading / akhir list
+                ============================================================ -->
+                {#if isLoadingMore}
+                  <div class="flex justify-center py-6">
+                    <div
+                      class="animate-spin rounded-full h-6 w-6 border-b-2 border-[#0a4682]"
+                    ></div>
+                  </div>
+                {:else if !hasMoreThreads}
+                  <p class="text-center text-xs text-gray-300 py-6">
+                    Udah paling bawah nih 👀
+                  </p>
+                {/if}
               {/if}
             {:else if threadView === "detail" && activeThread}
               <!-- Thread Detail -->
@@ -770,6 +904,16 @@ async function toggleReplyLike(reply) {
             Belum ada balasan, jadi yang pertama!
         </p>
     {/each}
+
+    {#if isLoadingMoreReplies}
+      <div class="flex justify-center py-4">
+        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-[#0a4682]"></div>
+      </div>
+    {:else if !hasMoreReplies && activeThread.replies.length > 0}
+      <p class="text-center text-xs text-gray-300 py-4">
+        Semua balasan udah kemuat 👀
+      </p>
+    {/if}
 </div>
 
               <!-- Reply box -->

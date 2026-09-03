@@ -22,6 +22,12 @@
   let totalUserDiDatabase = 0;
   let totalUserOnTeam = 0;
   let isExporting = false;
+
+  // State pagination (biasa, bukan infinite scroll)
+  let currentPage = 1;
+  let totalItems = 0;
+  let totalPage = 1;
+  let itemsPerPage = 10;
   
   // State untuk tab aktif
   let activeTab = "semua"; // "semua", "hariIni", "terlewat", "mendatang"
@@ -43,10 +49,10 @@
   });
 
   // Fungsi untuk mengambil data kegiatan dari backend
-  async function fetchKegiatanData() {
+  async function fetchKegiatanData(page = 1) {
     isLoading = true;
     try {
-      const response = await fetchWithAuth('/api/kegiatan/', {
+      const response = await fetchWithAuth(`/api/kegiatan/?page=${page}&limit=${itemsPerPage}`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -57,6 +63,11 @@
       if (response.ok) {
         const result = await response.json();
         console.log('Response kegiatan:', result);
+
+        const paging = result.data?.paging || {};
+        currentPage = paging.page || page;
+        totalItems = paging.totalItems || 0;
+        totalPage = paging.totalPage || 1;
         
         const kegiatanData = result.data?.data || [];
         
@@ -81,6 +92,9 @@
         jadwalAbsen.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
         
         console.log('JadwalAbsen setelah transformasi:', jadwalAbsen);
+
+        // Ambil total hadir buat item di page ini
+        await fetchAllTotalHadir();
       } else {
         console.error('Gagal fetch data:', response.status);
         jadwalAbsen = [];
@@ -90,6 +104,27 @@
       jadwalAbsen = [];
     } finally {
       isLoading = false;
+    }
+  }
+
+  // ============================================================
+  // PAGINATION FUNCTIONS
+  // ============================================================
+  function nextPage() {
+    if (currentPage < totalPage) {
+      fetchKegiatanData(currentPage + 1);
+    }
+  }
+
+  function prevPage() {
+    if (currentPage > 1) {
+      fetchKegiatanData(currentPage - 1);
+    }
+  }
+
+  function goToPage(page) {
+    if (page >= 1 && page <= totalPage && page !== currentPage) {
+      fetchKegiatanData(page);
     }
   }
 
@@ -405,9 +440,7 @@
       return;
     }
 
-    Promise.all([fetchKegiatanData(), fetchTotalUser()]).then(() => {
-      fetchAllTotalHadir();
-    });
+    Promise.all([fetchKegiatanData(1), fetchTotalUser()]);
   });
 
   function handleLogout() {
@@ -703,6 +736,60 @@
                 {/each}
               </div>
             </div>
+
+            <!-- ============================================================
+            PAGINATION
+            ============================================================ -->
+            {#if totalPage > 1}
+              <div class="flex flex-col items-center gap-3 px-2 py-4 sm:flex-row sm:justify-between">
+                <div class="text-xs text-gray-500">
+                  Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} dari {totalItems} data
+                </div>
+
+                <div class="flex items-center gap-1">
+                  <!-- Previous -->
+                  <button
+                    on:click={prevPage}
+                    disabled={currentPage === 1}
+                    class="px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+
+                  <!-- Pages -->
+                  <div class="flex gap-1">
+                    {#each Array.from({ length: totalPage }, (_, i) => i + 1) as page}
+                      {#if page === 1 || page === totalPage || (page >= currentPage - 1 && page <= currentPage + 1)}
+                        <button
+                          on:click={() => goToPage(page)}
+                          class="px-3 py-1.5 text-sm font-medium rounded-lg transition-colors
+                            {page === currentPage
+                              ? 'bg-[#0a4682] text-white'
+                              : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'}"
+                        >
+                          {page}
+                        </button>
+                      {:else if page === currentPage - 2 || page === currentPage + 2}
+                        <span class="px-2 py-1.5 text-sm text-gray-400">...</span>
+                      {/if}
+                    {/each}
+                  </div>
+
+                  <!-- Next -->
+                  <button
+                    on:click={nextPage}
+                    disabled={currentPage === totalPage}
+                    class="px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            {/if}
           {/if}
 
         {:else}
