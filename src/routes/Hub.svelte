@@ -4,9 +4,9 @@
   import Swal from "sweetalert2";
   import Sidebar from "../lib/Sidebar.svelte";
   import TheradCardBody from "../lib/TheradCardBody.svelte";
-  import TierlistTab from "../lib/TierlistTab.svelte";
+  import TierlistTab from "$lib/TierlistTab.svelte";
   import TopNavbar from "../lib/TopNavbar.svelte";
-    import { fetchWithAuth } from "../lib/auth";
+    import { fetchWithAuth } from "../lib/auth.js";
 
   let tierlistTabRef;
 
