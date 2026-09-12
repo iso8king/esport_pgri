@@ -6,7 +6,6 @@
   export let currentUserName;
   export let userAvatar;
 
-  /** @type {'list' | 'detail'} */
   let view = "list";
 
   let tierlists = [];
