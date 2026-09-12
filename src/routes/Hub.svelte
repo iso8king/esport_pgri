@@ -4,8 +4,11 @@
   import Swal from "sweetalert2";
   import Sidebar from "../lib/Sidebar.svelte";
   import TheradCardBody from "../lib/TheradCardBody.svelte";
+  import TierlistTab from "../lib/TierlistTab.svelte";
   import TopNavbar from "../lib/TopNavbar.svelte";
     import { fetchWithAuth } from "../lib/auth";
+
+  let tierlistTabRef;
 
   let innerWidth = 0;
   let currentUserName = "Loading...";
@@ -141,20 +144,22 @@
 
   // Dipanggil tiap kali <main> di-scroll. Kalau posisi scroll udah
   // mepet bawah (300px sebelum benar-benar bawah), auto load page berikutnya.
-  // Berlaku buat list thread MAUPUN list reply di dalam detail thread.
+  // Berlaku buat tab Thread MAUPUN tab Tier List.
   function handleScroll(event) {
-    if (activeTab !== "thread") return;
-
     const el = event.target;
     const distanceToBottom =
       el.scrollHeight - el.scrollTop - el.clientHeight;
 
     if (distanceToBottom >= 300) return;
 
-    if (threadView === "list") {
-      loadMoreThreads();
-    } else if (threadView === "detail") {
-      loadMoreReplies();
+    if (activeTab === "thread") {
+      if (threadView === "list") {
+        loadMoreThreads();
+      } else if (threadView === "detail") {
+        loadMoreReplies();
+      }
+    } else if (activeTab === "tierlist" && tierlistTabRef) {
+      tierlistTabRef.onScrollNearBottom();
     }
   }
 
@@ -568,14 +573,13 @@ async function toggleReplyLike(reply) {
               Thread
             </button>
             <button
-              disabled
-              class="px-4 py-2.5 text-sm font-bold border-b-2 border-transparent text-gray-300 cursor-not-allowed flex items-center gap-1.5"
+              on:click={() => (activeTab = "tierlist")}
+              class="px-4 py-2.5 text-sm font-bold border-b-2 transition-colors
+                        {activeTab === 'tierlist'
+                ? 'border-[#0a4682] text-[#0a4682]'
+                : 'border-transparent text-gray-400 hover:text-gray-600'}"
             >
               Tier List
-              <span
-                class="text-[10px] font-semibold bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded-full"
-                >Segera</span
-              >
             </button>
             <button
               disabled
@@ -937,6 +941,8 @@ async function toggleReplyLike(reply) {
                 </div>
               </div>
             {/if}
+          {:else if activeTab === "tierlist"}
+            <TierlistTab bind:this={tierlistTabRef} {currentUserName} {userAvatar} />
           {/if}
         </div>
       </main>

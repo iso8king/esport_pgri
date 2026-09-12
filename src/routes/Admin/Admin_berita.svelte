@@ -442,6 +442,18 @@
             Berita
           </button>
         </div>
+
+        <div>
+        <p class="flex items-center gap-2 px-2 mb-2 mt-5 text-xs font-semibold tracking-wider text-gray-400 uppercase">
+           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 3.87a4 4 0 00-3-3.87m-9 0a4 4 0 00-3 3.87" />
+        </svg>  
+          Hub
+        </p>
+        <div class="flex flex-col gap-1">
+          <button on:click={() => { window.location.href = "#/hub"; }} class="flex items-center w-full gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg text-gray-300 hover:bg-white/5 hover:text-white">
+       SmegioneHub </button>
+        </div>
       </div>
 
       <div class="p-5">
