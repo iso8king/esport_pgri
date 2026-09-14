@@ -28,7 +28,7 @@
   let composerImagePreview = null;
   let isSubmitting = false;
 
-  // reply composer state (MOCK, belum ada endpoint POST reply)
+  // reply composer state
   let replyContent = "";
   let isSubmittingReply = false;
 
@@ -36,10 +36,6 @@
     fetchTierlists(1);
   });
 
-  // ============================================================
-  // Dipanggil dari parent (SmegioneHub.svelte) tiap kali <main>
-  // di-scroll deket bawah, sementara tab aktif = "tierlist".
-  // ============================================================
   export function onScrollNearBottom() {
     if (view === "list") {
       loadMoreTierlists();
@@ -53,9 +49,6 @@
     return `/avatar/${pfp}`;
   }
 
-  // NOTE: asumsi gambar tierlist disajikan dari /assets/<filename>,
-  // sama kayak pola bukti absen di Absensi.svelte. Sesuaikan kalau
-  // ternyata path static file-nya beda di backend kamu.
   function normalizeImage(image) {
     if (!image) return null;
     return `/assets/${image}`;
@@ -68,14 +61,12 @@
       createdAt: raw.createdAt,
       image: normalizeImage(raw.image),
       author: {
+        id: raw.user?.id, // TAMBAHAN: untuk validasi authorId
         nama: raw.user?.nama || "Tanpa Nama",
         pfp: normalizePfp(raw.user?.pfp),
       },
       replyCount: raw._count?.replies ?? 0,
-      // Backend sekarang balikin likeCount langsung di root item
-      // (net vote, bisa negatif), bukan lagi di _count.likes.
       likeCount: raw.likeCount ?? 0,
-      // -1 | 0 | 1 — sekarang dibaca dari response beneran
       myVote: raw.myVote ?? 0,
     };
   }
@@ -92,24 +83,20 @@
         pfp: normalizePfp(raw.user?.pfp),
       },
       replyCount: raw._count?.replies ?? 0,
-      // Sama kayak list: prioritaskan raw.likeCount (format baru),
-      // fallback ke _count.likes kalau endpoint detail belum diupdate.
       likeCount: raw.likeCount ?? raw._count?.likes ?? 0,
-      // Sekarang beneran dibaca dari backend (myVote: -1 | 0 | 1)
       myVote: raw.myVote ?? 0,
       replies: [],
     };
   }
 
   function normalizeReply(raw) {
-    // Defensif: jaga-jaga kalau backend pakai key 'author' atau 'user'
-    // buat pengarang reply (contoh response reply masih kosong tadi).
     const authorRaw = raw.author || raw.user || {};
     return {
       id: raw.id,
       content: raw.content,
       createdAt: raw.createdAt,
       author: {
+        id: authorRaw.id, // TAMBAHAN: untuk validasi authorId
         nama: authorRaw.nama || "Tanpa Nama",
         pfp: normalizePfp(authorRaw.pfp),
       },
@@ -118,9 +105,6 @@
     };
   }
 
-  // ============================================================
-  // FETCH LIST TIERLIST (real, infinite scroll)
-  // ============================================================
   async function fetchTierlists(page = 1) {
     if (page === 1) {
       isLoadingList = true;
@@ -168,7 +152,7 @@
   }
 
   // ============================================================
-  // DETAIL TIERLIST + REPLIES (fetch real, page-based)
+  // DETAIL TIERLIST + REPLIES
   // ============================================================
   async function openTierlist(item) {
     view = "detail";
@@ -193,8 +177,6 @@
       activeTierlist.replies = rawReplies.map(normalizeReply);
 
       currentReplyPage = pagingReplies.page || 1;
-      // Sama kayak thread: kalau pagingReplies.totalPage keliatan gak akurat,
-      // fallback ke _count.replies sebagai acuan total yang lebih dipercaya.
       hasMoreReplies = activeTierlist.replies.length < activeTierlist.replyCount;
     } catch (e) {
       console.error("Gagal buka tierlist:", e);
@@ -258,7 +240,7 @@
   }
 
   // ============================================================
-  // COMPOSER: buat tierlist baru (real, POST multipart/form-data)
+  // COMPOSER
   // ============================================================
   function toggleComposer() {
     isComposerOpen = !isComposerOpen;
@@ -346,7 +328,11 @@
           content: newItem.content,
           createdAt: newItem.createdAt,
           image: normalizeImage(newItem.image),
-          author: { nama: currentUserName, pfp: userAvatar || null },
+          author: {
+            id: newItem.user?.id,
+            nama: currentUserName,
+            pfp: userAvatar || null,
+          },
           replyCount: 0,
           likeCount: 0,
           myVote: 0,
@@ -377,10 +363,271 @@
   }
 
   // ============================================================
-  // VOTE (real, POST /api/hub/tierlist/:id/vote — toggle up/downvote)
+  // EDIT TIERLIST — dengan authorId
   // ============================================================
-  // Set berisi id tierlist yang lagi diproses vote-nya, biar gak
-  // bisa diklik dobel sebelum request sebelumnya selesai (race condition).
+  async function editTierlist(item) {
+    const { value: content } = await Swal.fire({
+      title: "Edit Tier List",
+      input: "textarea",
+      inputValue: item.content,
+      inputPlaceholder: "Tulis caption tier list...",
+      inputAttributes: { maxlength: 1000 },
+      showCancelButton: true,
+      confirmButtonText: "Simpan",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#0a4682",
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return "Caption tidak boleh kosong!";
+        }
+      },
+    });
+
+    if (!content || !content.trim()) return;
+
+    try {
+      const res = await fetch("/api/hub/update?service=tierlist", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          content: content.trim(),
+          authorId: item.author.id,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          json.message || json.errors || "Gagal mengedit tier list",
+        );
+      }
+
+      item.content = content.trim();
+      tierlists = [...tierlists];
+
+      if (activeTierlist && activeTierlist.id === item.id) {
+        activeTierlist.content = content.trim();
+        activeTierlist = { ...activeTierlist };
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Tier list berhasil diperbarui.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Gagal edit tierlist:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal mengedit",
+        text: error.message || "Terjadi kesalahan.",
+        confirmButtonColor: "#0a4682",
+      });
+    }
+  }
+
+  // ============================================================
+  // DELETE TIERLIST — dengan authorId
+  // ============================================================
+  async function deleteTierlist(item) {
+    const confirm = await Swal.fire({
+      icon: "warning",
+      title: "Hapus Tier List?",
+      text: "Tier list yang dihapus tidak dapat dikembalikan.",
+      showCancelButton: true,
+      confirmButtonText: "Ya, hapus",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#dc2626",
+      reverseButtons: true,
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      const res = await fetch("/api/hub/delete?service=tierlist", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          authorId: item.author.id,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          json.message || json.errors || "Gagal menghapus tier list",
+        );
+      }
+
+      tierlists = tierlists.filter((tierlist) => tierlist.id !== item.id);
+
+      if (activeTierlist && activeTierlist.id === item.id) {
+        backToList();
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Tier list berhasil dihapus.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Gagal hapus tierlist:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal menghapus",
+        text: error.message || "Terjadi kesalahan.",
+        confirmButtonColor: "#0a4682",
+      });
+    }
+  }
+
+  // ============================================================
+  // EDIT REPLY — dengan authorId + tierlistId
+  // ============================================================
+  async function editReply(reply) {
+    const { value: content } = await Swal.fire({
+      title: "Edit Balasan",
+      input: "textarea",
+      inputValue: reply.content,
+      inputPlaceholder: "Tulis balasan...",
+      inputAttributes: { maxlength: 1000 },
+      showCancelButton: true,
+      confirmButtonText: "Simpan",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#0a4682",
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return "Balasan tidak boleh kosong!";
+        }
+      },
+    });
+
+    if (!content || !content.trim()) return;
+
+    try {
+      const res = await fetch("/api/hub/update?service=replyTierlist", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: reply.id,
+          content: content.trim(),
+          authorId: reply.author.id,
+          tierlistId: activeTierlist.id,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          json.message || json.errors || "Gagal mengedit balasan",
+        );
+      }
+
+      const replyIndex = activeTierlist.replies.findIndex(
+        (r) => r.id === reply.id,
+      );
+      if (replyIndex !== -1) {
+        activeTierlist.replies[replyIndex].content = content.trim();
+        activeTierlist = { ...activeTierlist };
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Balasan berhasil diperbarui.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Gagal edit reply:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal mengedit",
+        text: error.message || "Terjadi kesalahan.",
+        confirmButtonColor: "#0a4682",
+      });
+    }
+  }
+
+  // ============================================================
+  // DELETE REPLY — dengan authorId + tierlistId
+  // ============================================================
+  async function deleteReply(reply) {
+    const confirm = await Swal.fire({
+      icon: "warning",
+      title: "Hapus Balasan?",
+      text: "Balasan yang dihapus tidak dapat dikembalikan.",
+      showCancelButton: true,
+      confirmButtonText: "Ya, hapus",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#dc2626",
+      reverseButtons: true,
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      const res = await fetch("/api/hub/delete?service=replyTierlist", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: reply.id,
+          authorId: reply.author.id,
+          tierlistId: activeTierlist.id,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          json.message || json.errors || "Gagal menghapus balasan",
+        );
+      }
+
+      activeTierlist.replies = activeTierlist.replies.filter(
+        (r) => r.id !== reply.id,
+      );
+      activeTierlist.replyCount = Math.max(
+        0,
+        activeTierlist.replyCount - 1,
+      );
+      activeTierlist = { ...activeTierlist };
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Balasan berhasil dihapus.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Gagal hapus reply:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal menghapus",
+        text: error.message || "Terjadi kesalahan.",
+        confirmButtonColor: "#0a4682",
+      });
+    }
+  }
+
+  // ============================================================
+  // VOTE
+  // ============================================================
   let votingIds = new Set();
 
   async function handleVote(item, dir) {
@@ -391,7 +638,6 @@
     const prevVote = item.myVote;
     const prevLikeCount = item.likeCount;
 
-    // Optimistic update dulu biar responsif
     const optimisticVote = prevVote === dir ? 0 : dir;
     item.myVote = optimisticVote;
     item.likeCount += optimisticVote - prevVote;
@@ -411,13 +657,11 @@
       }
 
       const json = await res.json();
-      // Samain sama nilai final dari server (source of truth)
       item.likeCount = json.data?.likeCount ?? item.likeCount;
       item.myVote = json.data?.myVote ?? item.myVote;
       tierlists = [...tierlists];
     } catch (e) {
       console.error("Gagal vote tierlist:", e);
-      // Rollback ke nilai sebelum diklik
       item.myVote = prevVote;
       item.likeCount = prevLikeCount;
       tierlists = [...tierlists];
@@ -482,6 +726,9 @@
     }
   }
 
+  // ============================================================
+  // SUBMIT REPLY
+  // ============================================================
   async function submitReply() {
     if (!replyContent.trim() || !activeTierlist) return;
 
@@ -492,36 +739,29 @@
         `/api/hub/tierlist/${activeTierlist.id}/reply`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            content: replyContent.trim()
-          })
-        }
+            content: replyContent.trim(),
+          }),
+        },
       );
 
       const json = await res.json();
 
       if (!res.ok) {
         throw new Error(
-          json.errors || json.message || "Gagal mengirim reply"
+          json.errors || json.message || "Gagal mengirim reply",
         );
       }
 
       const newReply = normalizeReply(json.data);
 
-      activeTierlist.replies = [
-        ...activeTierlist.replies,
-        newReply
-      ];
-
+      activeTierlist.replies = [...activeTierlist.replies, newReply];
       activeTierlist.replyCount += 1;
       activeTierlist = { ...activeTierlist };
 
       replyContent = "";
-
     } catch (error) {
       console.error("Gagal mengirim reply:", error);
 
@@ -529,9 +769,8 @@
         icon: "error",
         title: "Gagal mengirim balasan",
         text: error.message || "Terjadi kesalahan.",
-        confirmButtonColor: "#0a4682"
+        confirmButtonColor: "#0a4682",
       });
-
     } finally {
       isSubmittingReply = false;
     }
@@ -638,13 +877,40 @@
   {:else}
     <div class="space-y-3">
       {#each tierlists as tierlist (tierlist.id)}
-        <div class="bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-all p-4">
+        <div class="relative bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-all p-4">
           <TierlistCardBody
             {tierlist}
             {timeAgo}
             onOpen={() => openTierlist(tierlist)}
             onVote={(dir) => handleVote(tierlist, dir)}
           />
+
+          {#if tierlist.author.nama === currentUserName}
+            <div class="absolute top-4 right-4 flex items-center gap-1">
+              <button
+                type="button"
+                on:click|stopPropagation={() => editTierlist(tierlist)}
+                class="p-2 text-gray-400 hover:text-[#0a4682] hover:bg-blue-50 rounded-lg transition-colors"
+                title="Edit"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 7.125L16.875 4.5M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                on:click|stopPropagation={() => deleteTierlist(tierlist)}
+                class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="Hapus"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M9 7V4h6v3m-8 0l1 13h6l1-13M10 11v5m4-5v5" />
+                </svg>
+              </button>
+            </div>
+          {/if}
         </div>
       {/each}
     </div>
@@ -675,22 +941,51 @@
     </button>
 
     <div class="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden mb-4">
-      <div class="flex items-center gap-3 p-5 sm:p-6 pb-3">
-        {#if activeTierlist.author.pfp}
-          <img
-            src={activeTierlist.author.pfp}
-            alt={activeTierlist.author.nama}
-            class="w-10 h-10 rounded-full object-cover border border-gray-200"
-          />
-        {:else}
-          <div class="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center">
-            <span class="text-sm font-bold text-white">{activeTierlist.author.nama.charAt(0).toUpperCase()}</span>
+      <div class="flex items-center justify-between p-5 sm:p-6 pb-3">
+        <div class="flex items-center gap-3">
+          {#if activeTierlist.author.pfp}
+            <img
+              src={activeTierlist.author.pfp}
+              alt={activeTierlist.author.nama}
+              class="w-10 h-10 rounded-full object-cover border border-gray-200"
+            />
+          {:else}
+            <div class="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center">
+              <span class="text-sm font-bold text-white">{activeTierlist.author.nama.charAt(0).toUpperCase()}</span>
+            </div>
+          {/if}
+          <div>
+            <p class="text-sm font-bold text-gray-800">{activeTierlist.author.nama}</p>
+            <p class="text-xs text-gray-400">{timeAgo(activeTierlist.createdAt)}</p>
+          </div>
+        </div>
+
+        {#if activeTierlist.author.nama === currentUserName}
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              on:click={() => editTierlist(activeTierlist)}
+              class="p-2 text-gray-400 hover:text-[#0a4682] hover:bg-blue-50 rounded-lg transition-colors"
+              title="Edit"
+            >
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 7.125L16.875 4.5M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              on:click={() => deleteTierlist(activeTierlist)}
+              class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Hapus"
+            >
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M9 7V4h6v3m-8 0l1 13h6l1-13M10 11v5m4-5v5" />
+              </svg>
+            </button>
           </div>
         {/if}
-        <div>
-          <p class="text-sm font-bold text-gray-800">{activeTierlist.author.nama}</p>
-          <p class="text-xs text-gray-400">{timeAgo(activeTierlist.createdAt)}</p>
-        </div>
       </div>
 
       {#if activeTierlist.image}
@@ -744,9 +1039,38 @@
             </div>
           {/if}
           <div class="flex-1">
-            <div class="flex items-center gap-2">
-              <p class="text-sm font-bold text-gray-800">{reply.author.nama}</p>
-              <p class="text-xs text-gray-400">{timeAgo(reply.createdAt)}</p>
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <p class="text-sm font-bold text-gray-800">{reply.author.nama}</p>
+                <p class="text-xs text-gray-400">{timeAgo(reply.createdAt)}</p>
+              </div>
+
+              {#if reply.author.nama === currentUserName}
+                <div class="flex items-center gap-1">
+                  <button
+                    type="button"
+                    on:click={() => editReply(reply)}
+                    class="p-1 text-gray-400 hover:text-[#0a4682] hover:bg-blue-50 rounded transition-colors"
+                    title="Edit"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 7.125L16.875 4.5M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                    </svg>
+                  </button>
+
+                  <button
+                    type="button"
+                    on:click={() => deleteReply(reply)}
+                    class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    title="Hapus"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M9 7V4h6v3m-8 0l1 13h6l1-13M10 11v5m4-5v5" />
+                    </svg>
+                  </button>
+                </div>
+              {/if}
             </div>
             <p class="text-sm text-gray-600 mt-1">{reply.content}</p>
           </div>
@@ -764,7 +1088,7 @@
       {/if}
     </div>
 
-    <!-- Reply box (MOCK submit) -->
+    <!-- Reply box -->
     <div class="fixed bottom-0 left-0 right-0 md:left-64 bg-white border-t border-gray-200 p-3 sm:p-4">
       <div class="max-w-3xl mx-auto flex items-end gap-2">
         <textarea

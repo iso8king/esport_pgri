@@ -6,7 +6,7 @@
   import TheradCardBody from "../lib/TheradCardBody.svelte";
   import TierlistTab from "$lib/TierlistTab.svelte";
   import TopNavbar from "../lib/TopNavbar.svelte";
-    import { fetchWithAuth } from "../lib/auth.js";
+  import { fetchWithAuth } from "../lib/auth.js";
 
   let tierlistTabRef;
 
@@ -68,8 +68,8 @@
   /** @type {'list' | 'detail'} */
   let threadView = "list";
 
-  let isLoadingThreads = true; // loading awal (page 1)
-  let isLoadingMore = false; // loading pas nambah page berikutnya
+  let isLoadingThreads = true;
+  let isLoadingMore = false;
   let hasMoreThreads = true;
   let currentPage = 1;
   let threads = [];
@@ -84,12 +84,11 @@
   // reply state
   let replyContent = "";
   let isSubmittingReply = false;
-  let isLoadingReplies = false; // loading awal replies (page 1) pas buka thread
-  let isLoadingMoreReplies = false; // loading pas nambah page reply berikutnya
+  let isLoadingReplies = false;
+  let isLoadingMoreReplies = false;
   let hasMoreReplies = true;
   let currentReplyPage = 1;
 
-  // ref ke elemen <main> yang scrollable, buat dengerin event scroll
   let mainEl;
 
   async function fetchThreads(page = 1) {
@@ -142,9 +141,6 @@
     fetchThreads(currentPage + 1);
   }
 
-  // Dipanggil tiap kali <main> di-scroll. Kalau posisi scroll udah
-  // mepet bawah (300px sebelum benar-benar bawah), auto load page berikutnya.
-  // Berlaku buat tab Thread MAUPUN tab Tier List.
   function handleScroll(event) {
     const el = event.target;
     const distanceToBottom =
@@ -206,7 +202,6 @@
     threadView = "detail";
     activeThread = { ...thread, replies: [] };
 
-    // reset pagination reply tiap kali buka thread baru
     currentReplyPage = 1;
     hasMoreReplies = true;
     isLoadingReplies = true;
@@ -226,10 +221,6 @@
       activeThread.replies = rawReplies.map(normalizeReply);
 
       currentReplyPage = pagingReplies.page || 1;
-
-      // NOTE: pagingReplies.totalItems/totalPage dari backend keliatan buggy
-      // (cuma ngitung item di page ini, bukan total beneran di DB).
-      // Jadi pakai thread._count.replies sebagai acuan total yang akurat.
       hasMoreReplies = activeThread.replies.length < activeThread.replyCount;
     } catch (e) {
       console.error("Gagal buka thread:", e);
@@ -274,13 +265,8 @@
       activeThread = { ...activeThread };
 
       currentReplyPage = pagingReplies.page || nextPage;
-
-      // Sama kayak di openThread: pakai _count.replies (activeThread.replyCount)
-      // sebagai acuan total yang akurat, bukan pagingReplies yang buggy.
       hasMoreReplies = activeThread.replies.length < activeThread.replyCount;
 
-      // Safety: kalau backend gak balikin reply baru sama sekali padahal
-      // hasMoreReplies masih true, paksa stop biar gak infinite loop nge-fetch.
       if (rawReplies.length === 0) {
         hasMoreReplies = false;
       }
@@ -307,81 +293,360 @@
     composerContent = "";
   }
 
-
   async function submitThread() {
     if (!composerTitle.trim() || !composerContent.trim()) {
-        Swal.fire({
-            icon: "warning",
-            title: "Lengkapi dulu",
-            text: "Judul dan isi thread wajib diisi.",
-            confirmButtonColor: "#0a4682",
-        });
-        return;
+      Swal.fire({
+        icon: "warning",
+        title: "Lengkapi dulu",
+        text: "Judul dan isi thread wajib diisi.",
+        confirmButtonColor: "#0a4682",
+      });
+      return;
     }
 
     isSubmittingThread = true;
     try {
-        const res = await fetch("/api/hub/threads/create", {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                title: composerTitle.trim(), 
-                content: composerContent.trim() 
-            }),
-        });
+      const res = await fetch("/api/hub/threads/create", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: composerTitle.trim(),
+          content: composerContent.trim(),
+        }),
+      });
 
-        const json = await res.json();
+      const json = await res.json();
 
-        if (!res.ok) {
-            throw new Error(json.message || "Gagal membuat thread");
-        }
+      if (!res.ok) {
+        throw new Error(json.message || "Gagal membuat thread");
+      }
 
-        const newThread = json.data || json;
+      const newThread = json.data || json;
 
-        threads = [
-            {
-                id: newThread.id,
-                title: newThread.title,
-                content: newThread.content,
-                pinned: newThread.pinned || false,
-                createdAt: new Date(newThread.createdAt || Date.now()),
-                author: {
-                    nama: newThread.author?.nama || currentUserName,
-                    pfp: newThread.author?.pfp || userAvatar || null,
-                },
-                replyCount: newThread.replyCount || 0,
-                likeCount: newThread.likeCount || 0,
-                likedByMe: newThread.likedByMe || false,
-                replies: newThread.replies || [],
-            },
-            ...threads,
-        ];
+      threads = [
+        {
+          id: newThread.id,
+          title: newThread.title,
+          content: newThread.content,
+          pinned: newThread.pinned || false,
+          createdAt: new Date(newThread.createdAt || Date.now()),
+          author: {
+            id: newThread.author?.id,
+            nama: newThread.author?.nama || currentUserName,
+            pfp: newThread.author?.pfp || userAvatar || null,
+          },
+          replyCount: newThread.replyCount || 0,
+          likeCount: newThread.likeCount || 0,
+          likedByMe: newThread.likedByMe || false,
+          replies: newThread.replies || [],
+        },
+        ...threads,
+      ];
 
-        Swal.fire({
-            icon: "success",
-            title: "Berhasil!",
-            text: "Thread berhasil dibuat.",
-            timer: 1500,
-            showConfirmButton: false,
-        });
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Thread berhasil dibuat.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
 
-        cancelComposer();
-
+      cancelComposer();
     } catch (error) {
-        console.error("Error creating thread:", error);
-        Swal.fire({
-            icon: "error",
-            title: "Gagal bikin thread",
-            text: error.message || "Terjadi kesalahan, coba lagi.",
-            confirmButtonColor: "#0a4682",
-        });
+      console.error("Error creating thread:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal bikin thread",
+        text: error.message || "Terjadi kesalahan, coba lagi.",
+        confirmButtonColor: "#0a4682",
+      });
     } finally {
-        isSubmittingThread = false;
+      isSubmittingThread = false;
     }
-}
+  }
 
-  // TODO: ganti dengan fetch beneran ke POST /api/threads/:id/replies
+  // ============================================================
+  // EDIT THREAD
+  // ============================================================
+  async function editThread(thread) {
+    const { value: formValues } = await Swal.fire({
+      title: "Edit Thread",
+      html: `
+        <input id="swal-title" class="swal2-input" placeholder="Judul thread" value="${thread.title.replace(/"/g, '&quot;')}" maxlength="150">
+        <textarea id="swal-content" class="swal2-textarea" placeholder="Isi thread" maxlength="1000">${thread.content || ""}</textarea>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: "Simpan",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#0a4682",
+      preConfirm: () => {
+        const title = document.getElementById("swal-title").value.trim();
+        const content = document.getElementById("swal-content").value.trim();
+        if (!title || !content) {
+          Swal.showValidationMessage("Judul dan isi tidak boleh kosong!");
+          return false;
+        }
+        return { title, content };
+      },
+    });
+
+    if (!formValues) return;
+
+    try {
+      const res = await fetch("/api/hub/update?service=thread", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: thread.id,
+          title: formValues.title,
+          content: formValues.content,
+          pinned: thread.pinned,
+          authorId: thread.author.id,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          json.message || json.errors || "Gagal mengedit thread",
+        );
+      }
+
+      // Update di list
+      const threadIndex = threads.findIndex((t) => t.id === thread.id);
+      if (threadIndex !== -1) {
+        threads[threadIndex].title = formValues.title;
+        threads[threadIndex].content = formValues.content;
+        threads = [...threads];
+      }
+
+      // Update di activeThread
+      if (activeThread && activeThread.id === thread.id) {
+        activeThread.title = formValues.title;
+        activeThread.content = formValues.content;
+        activeThread = { ...activeThread };
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Thread berhasil diperbarui.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Gagal edit thread:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal mengedit",
+        text: error.message || "Terjadi kesalahan.",
+        confirmButtonColor: "#0a4682",
+      });
+    }
+  }
+
+  // ============================================================
+  // DELETE THREAD
+  // ============================================================
+  async function deleteThread(thread) {
+    const confirm = await Swal.fire({
+      icon: "warning",
+      title: "Hapus Thread?",
+      text: "Thread yang dihapus tidak dapat dikembalikan.",
+      showCancelButton: true,
+      confirmButtonText: "Ya, hapus",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#dc2626",
+      reverseButtons: true,
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      const res = await fetch("/api/hub/delete?service=thread", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: thread.id,
+          authorId: thread.author.id,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          json.message || json.errors || "Gagal menghapus thread",
+        );
+      }
+
+      threads = threads.filter((t) => t.id !== thread.id);
+
+      if (activeThread && activeThread.id === thread.id) {
+        backToList();
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Thread berhasil dihapus.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Gagal hapus thread:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal menghapus",
+        text: error.message || "Terjadi kesalahan.",
+        confirmButtonColor: "#0a4682",
+      });
+    }
+  }
+
+  // ============================================================
+  // EDIT REPLY THREAD
+  // ============================================================
+  async function editReplyThread(reply) {
+    const { value: content } = await Swal.fire({
+      title: "Edit Balasan",
+      input: "textarea",
+      inputValue: reply.content,
+      inputPlaceholder: "Tulis balasan...",
+      inputAttributes: { maxlength: 1000 },
+      showCancelButton: true,
+      confirmButtonText: "Simpan",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#0a4682",
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return "Balasan tidak boleh kosong!";
+        }
+      },
+    });
+
+    if (!content || !content.trim()) return;
+
+    try {
+      const res = await fetch("/api/hub/update?service=replyThread", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: reply.id,
+          content: content.trim(),
+          authorId: reply.author.id,
+          threadId: activeThread.id,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          json.message || json.errors || "Gagal mengedit balasan",
+        );
+      }
+
+      const replyIndex = activeThread.replies.findIndex(
+        (r) => r.id === reply.id,
+      );
+      if (replyIndex !== -1) {
+        activeThread.replies[replyIndex].content = content.trim();
+        activeThread = { ...activeThread };
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Balasan berhasil diperbarui.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Gagal edit reply:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal mengedit",
+        text: error.message || "Terjadi kesalahan.",
+        confirmButtonColor: "#0a4682",
+      });
+    }
+  }
+
+  // ============================================================
+  // DELETE REPLY THREAD
+  // ============================================================
+  async function deleteReplyThread(reply) {
+    const confirm = await Swal.fire({
+      icon: "warning",
+      title: "Hapus Balasan?",
+      text: "Balasan yang dihapus tidak dapat dikembalikan.",
+      showCancelButton: true,
+      confirmButtonText: "Ya, hapus",
+      cancelButtonText: "Batal",
+      confirmButtonColor: "#dc2626",
+      reverseButtons: true,
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      const res = await fetch("/api/hub/delete?service=replyThread", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: reply.id,
+          authorId: reply.author.id,
+          threadId: activeThread.id,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          json.message || json.errors || "Gagal menghapus balasan",
+        );
+      }
+
+      activeThread.replies = activeThread.replies.filter(
+        (r) => r.id !== reply.id,
+      );
+      activeThread.replyCount = Math.max(0, activeThread.replyCount - 1);
+      activeThread = { ...activeThread };
+
+      // Update di threads list
+      const threadIndex = threads.findIndex((t) => t.id === activeThread.id);
+      if (threadIndex !== -1) {
+        threads[threadIndex].replyCount = activeThread.replyCount;
+        threads = [...threads];
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Berhasil!",
+        text: "Balasan berhasil dihapus.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Gagal hapus reply:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Gagal menghapus",
+        text: error.message || "Terjadi kesalahan.",
+        confirmButtonColor: "#0a4682",
+      });
+    }
+  }
+
   async function submitReply() {
     if (!replyContent.trim() || !activeThread) return;
 
@@ -391,24 +656,35 @@
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: replyContent }),
+        body: JSON.stringify({ content: replyContent.trim() }),
       });
 
-      activeThread.replies = [
-        ...activeThread.replies,
-        {
-          id: crypto.randomUUID(),
-          content: replyContent,
-          createdAt: new Date(),
-          author: { nama: currentUserName, pfp: userAvatar || null },
-        },
-      ];
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json.errors || json.message || "Gagal kirim balasan");
+      }
+
+      const newReply = normalizeReply(json.data);
+
+      activeThread.replies = [...activeThread.replies, newReply];
       activeThread.replyCount += 1;
+      activeThread = { ...activeThread };
+
+      // Update di threads list
+      const threadIndex = threads.findIndex((t) => t.id === activeThread.id);
+      if (threadIndex !== -1) {
+        threads[threadIndex].replyCount = activeThread.replyCount;
+        threads = [...threads];
+      }
+
       replyContent = "";
     } catch (e) {
+      console.error("Gagal kirim balasan:", e);
       Swal.fire({
         icon: "error",
         title: "Gagal kirim balasan",
+        text: e.message || "Terjadi kesalahan.",
         confirmButtonColor: "#0a4682",
       });
     } finally {
@@ -416,104 +692,104 @@
     }
   }
 
-async function toggleLike(thread) {
+  async function toggleLike(thread) {
     try {
-        // Optimistic update
-        const wasLiked = thread.likedByMe;
-        thread.likedByMe = !thread.likedByMe;
-        thread.likeCount += thread.likedByMe ? 1 : -1;
-        threads = [...threads];
+      const wasLiked = thread.likedByMe;
+      thread.likedByMe = !thread.likedByMe;
+      thread.likeCount += thread.likedByMe ? 1 : -1;
+      threads = [...threads];
 
-        const res = await fetchWithAuth(`/api/hub/threads/${thread.id}/like`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-        });
+      const res = await fetchWithAuth(`/api/hub/threads/${thread.id}/like`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
 
-        if (!res.ok) {
-            // Rollback jika gagal
-            thread.likedByMe = wasLiked;
-            thread.likeCount += wasLiked ? 1 : -1;
-            threads = [...threads];
-            
-            const json = await res.json().catch(() => ({}));
-            Swal.fire({
-                icon: "error",
-                title: "Gagal",
-                text: json.message || "Gagal menyukai thread.",
-                confirmButtonColor: "#0a4682",
-            });
-        }
-
-    } catch (error) {
-        console.error("Error toggling like:", error);
-        // Rollback
-        const wasLiked = thread.likedByMe;
-        thread.likedByMe = !wasLiked;
+      if (!res.ok) {
+        thread.likedByMe = wasLiked;
         thread.likeCount += wasLiked ? 1 : -1;
         threads = [...threads];
-        
+
+        const json = await res.json().catch(() => ({}));
         Swal.fire({
-            icon: "error",
-            title: "Gagal",
-            text: "Terjadi kesalahan, silakan coba lagi.",
-            confirmButtonColor: "#0a4682",
+          icon: "error",
+          title: "Gagal",
+          text: json.message || "Gagal menyukai thread.",
+          confirmButtonColor: "#0a4682",
         });
-    }
-}
-
-async function toggleReplyLike(reply) {
-    try {
-        const wasLiked = reply.likedByMe;
-        reply.likedByMe = !reply.likedByMe;
-        reply.likeCount = (reply.likeCount || 0) + (reply.likedByMe ? 1 : -1);
-        
-        activeThread = { ...activeThread };
-        
-        const threadIndex = threads.findIndex(t => t.id === activeThread.id);
-        if (threadIndex !== -1) {
-            const replyIndex = threads[threadIndex].replies.findIndex(r => r.id === reply.id);
-            if (replyIndex !== -1) {
-                threads[threadIndex].replies[replyIndex] = { ...reply };
-                threads = [...threads];
-            }
-        }
-
-        const res = await fetch(`/api/hub/threads/${activeThread.id}/reply/${reply.id}/like`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-        });
-
-        if (!res.ok) {
-            reply.likedByMe = wasLiked;
-            reply.likeCount = (reply.likeCount || 0) + (wasLiked ? 1 : -1);
-            activeThread = { ...activeThread };
-            
-            const json = await res.json().catch(() => ({}));
-            Swal.fire({
-                icon: "error",
-                title: "Gagal",
-                text: json.message || "Gagal menyukai balasan.",
-                confirmButtonColor: "#0a4682",
-            });
-        }
-
+      }
     } catch (error) {
-        console.error("Error toggling reply like:", error);
-        const wasLiked = reply.likedByMe;
-        reply.likedByMe = !wasLiked;
+      console.error("Error toggling like:", error);
+      const wasLiked = thread.likedByMe;
+      thread.likedByMe = !wasLiked;
+      thread.likeCount += wasLiked ? 1 : -1;
+      threads = [...threads];
+
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: "Terjadi kesalahan, silakan coba lagi.",
+        confirmButtonColor: "#0a4682",
+      });
+    }
+  }
+
+  async function toggleReplyLike(reply) {
+    try {
+      const wasLiked = reply.likedByMe;
+      reply.likedByMe = !reply.likedByMe;
+      reply.likeCount = (reply.likeCount || 0) + (reply.likedByMe ? 1 : -1);
+
+      activeThread = { ...activeThread };
+
+      const threadIndex = threads.findIndex((t) => t.id === activeThread.id);
+      if (threadIndex !== -1) {
+        const replyIndex = threads[threadIndex].replies.findIndex(
+          (r) => r.id === reply.id,
+        );
+        if (replyIndex !== -1) {
+          threads[threadIndex].replies[replyIndex] = { ...reply };
+          threads = [...threads];
+        }
+      }
+
+      const res = await fetch(
+        `/api/hub/threads/${activeThread.id}/reply/${reply.id}/like`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+
+      if (!res.ok) {
+        reply.likedByMe = wasLiked;
         reply.likeCount = (reply.likeCount || 0) + (wasLiked ? 1 : -1);
         activeThread = { ...activeThread };
-        
+
+        const json = await res.json().catch(() => ({}));
         Swal.fire({
-            icon: "error",
-            title: "Gagal",
-            text: "Terjadi kesalahan, silakan coba lagi.",
-            confirmButtonColor: "#0a4682",
+          icon: "error",
+          title: "Gagal",
+          text: json.message || "Gagal menyukai balasan.",
+          confirmButtonColor: "#0a4682",
         });
+      }
+    } catch (error) {
+      console.error("Error toggling reply like:", error);
+      const wasLiked = reply.likedByMe;
+      reply.likedByMe = !wasLiked;
+      reply.likeCount = (reply.likeCount || 0) + (wasLiked ? 1 : -1);
+      activeThread = { ...activeThread };
+
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: "Terjadi kesalahan, silakan coba lagi.",
+        confirmButtonColor: "#0a4682",
+      });
     }
-}
+  }
 
   function timeAgo(date) {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
@@ -674,10 +950,7 @@ async function toggleReplyLike(reply) {
               {:else}
                 <div class="space-y-3">
                   {#each threads.filter((t) => t.pinned) as thread}
-                    <button
-                      on:click={() => openThread(thread)}
-                      class="w-full text-left bg-white border border-amber-100 bg-amber-50/40 rounded-2xl shadow-sm hover:shadow-md transition-all p-4"
-                    >
+                    <div class="relative w-full text-left bg-white border border-amber-100 bg-amber-50/40 rounded-2xl shadow-sm hover:shadow-md transition-all p-4">
                       <div class="flex items-center gap-1.5 mb-2">
                         <svg
                           class="w-3.5 h-3.5 text-amber-500"
@@ -692,31 +965,90 @@ async function toggleReplyLike(reply) {
                           >Pinned</span
                         >
                       </div>
-                      <TheradCardBody
-                        {thread}
-                        {timeAgo}
-                        onLike={() => toggleLike(thread)}
-                      />
-                    </button>
+
+                      <button
+                        on:click={() => openThread(thread)}
+                        class="w-full text-left"
+                      >
+                        <TheradCardBody
+                          {thread}
+                          {timeAgo}
+                          onLike={() => toggleLike(thread)}
+                        />
+                      </button>
+
+                      <!-- TOMBOL EDIT & HAPUS THREAD -->
+                      {#if thread.author.nama === currentUserName}
+                        <div class="absolute top-4 right-4 flex items-center gap-1">
+                          <button
+                            type="button"
+                            on:click|stopPropagation={() => editThread(thread)}
+                            class="p-2 text-gray-400 hover:text-[#0a4682] hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 7.125L16.875 4.5M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            on:click|stopPropagation={() => deleteThread(thread)}
+                            class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Hapus"
+                          >
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M9 7V4h6v3m-8 0l1 13h6l1-13M10 11v5m4-5v5" />
+                            </svg>
+                          </button>
+                        </div>
+                      {/if}
+                    </div>
                   {/each}
 
                   {#each threads.filter((t) => !t.pinned) as thread}
-                    <button
-                      on:click={() => openThread(thread)}
-                      class="w-full text-left bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-all p-4"
-                    >
-                      <TheradCardBody
-                        {thread}
-                        {timeAgo}
-                        onLike={() => toggleLike(thread)}
-                      />
-                    </button>
+                    <div class="relative w-full text-left bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-all p-4">
+                      <button
+                        on:click={() => openThread(thread)}
+                        class="w-full text-left"
+                      >
+                        <TheradCardBody
+                          {thread}
+                          {timeAgo}
+                          onLike={() => toggleLike(thread)}
+                        />
+                      </button>
+
+                      <!-- TOMBOL EDIT & HAPUS THREAD -->
+                      {#if thread.author.nama === currentUserName}
+                        <div class="absolute top-4 right-4 flex items-center gap-1">
+                          <button
+                            type="button"
+                            on:click|stopPropagation={() => editThread(thread)}
+                            class="p-2 text-gray-400 hover:text-[#0a4682] hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 7.125L16.875 4.5M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            on:click|stopPropagation={() => deleteThread(thread)}
+                            class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Hapus"
+                          >
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M9 7V4h6v3m-8 0l1 13h6l1-13M10 11v5m4-5v5" />
+                            </svg>
+                          </button>
+                        </div>
+                      {/if}
+                    </div>
                   {/each}
                 </div>
 
-                <!-- ============================================================
-                INFINITE SCROLL: indikator loading / akhir list
-                ============================================================ -->
                 {#if isLoadingMore}
                   <div class="flex justify-center py-6">
                     <div
@@ -754,32 +1086,61 @@ async function toggleReplyLike(reply) {
               <div
                 class="bg-white border border-slate-100 rounded-2xl shadow-sm p-5 sm:p-6 mb-4"
               >
-                <div class="flex items-center gap-3 mb-4">
-                  {#if activeThread.author.pfp}
-                    <img
-                      src={activeThread.author.pfp}
-                      alt={activeThread.author.nama}
-                      class="w-10 h-10 rounded-full object-cover border border-gray-200"
-                    />
-                  {:else}
-                    <div
-                      class="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center"
-                    >
-                      <span class="text-sm font-bold text-white"
-                        >{activeThread.author.nama
-                          .charAt(0)
-                          .toUpperCase()}</span
+                <div class="flex items-center justify-between gap-3 mb-4">
+                  <div class="flex items-center gap-3">
+                    {#if activeThread.author.pfp}
+                      <img
+                        src={activeThread.author.pfp}
+                        alt={activeThread.author.nama}
+                        class="w-10 h-10 rounded-full object-cover border border-gray-200"
+                      />
+                    {:else}
+                      <div
+                        class="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center"
                       >
+                        <span class="text-sm font-bold text-white"
+                          >{activeThread.author.nama
+                            .charAt(0)
+                            .toUpperCase()}</span
+                        >
+                      </div>
+                    {/if}
+                    <div>
+                      <p class="text-sm font-bold text-gray-800">
+                        {activeThread.author.nama}
+                      </p>
+                      <p class="text-xs text-gray-400">
+                        {timeAgo(activeThread.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- TOMBOL EDIT & HAPUS THREAD DI DETAIL -->
+                  {#if activeThread.author.nama === currentUserName}
+                    <div class="flex items-center gap-1">
+                      <button
+                        type="button"
+                        on:click={() => editThread(activeThread)}
+                        class="p-2 text-gray-400 hover:text-[#0a4682] hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit"
+                      >
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 7.125L16.875 4.5M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        on:click={() => deleteThread(activeThread)}
+                        class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Hapus"
+                      >
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M9 7V4h6v3m-8 0l1 13h6l1-13M10 11v5m4-5v5" />
+                        </svg>
+                      </button>
                     </div>
                   {/if}
-                  <div>
-                    <p class="text-sm font-bold text-gray-800">
-                      {activeThread.author.nama}
-                    </p>
-                    <p class="text-xs text-gray-400">
-                      {timeAgo(activeThread.createdAt)}
-                    </p>
-                  </div>
                 </div>
 
                 <h2 class="text-xl font-extrabold text-[#0b355b] mb-2">
@@ -860,65 +1221,95 @@ async function toggleReplyLike(reply) {
               </h3>
 
               <div class="space-y-3 mb-24">
-    {#each activeThread.replies as reply}
-        <div class="bg-white border border-slate-100 rounded-xl shadow-sm p-4 flex gap-3">
-            {#if reply.author.pfp}
-                <img
-                    src={reply.author.pfp}
-                    alt={reply.author.nama}
-                    class="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"
-                />
-            {:else}
-                <div class="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center shrink-0">
-                    <span class="text-xs font-bold text-white">{reply.author.nama.charAt(0).toUpperCase()}</span>
-                </div>
-            {/if}
-            
-            <div class="flex-1">
-                <div class="flex items-center gap-2">
-                    <p class="text-sm font-bold text-gray-800">{reply.author.nama}</p>
-                    <p class="text-xs text-gray-400">{timeAgo(reply.createdAt)}</p>
-                </div>
-                <p class="text-sm text-gray-600 mt-1">{reply.content}</p>
-                
-                <!-- Like Button untuk Reply -->
-                <button
-                    on:click={() => toggleReplyLike(reply)}
-                    class="flex items-center gap-1 mt-2 text-xs font-medium transition-colors {reply.likedByMe ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}"
-                >
-                    <svg
-                        class="w-3.5 h-3.5"
-                        fill={reply.likedByMe ? "currentColor" : "none"}
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        stroke-width="2"
-                    >
-                        <path
+                {#each activeThread.replies as reply}
+                  <div class="bg-white border border-slate-100 rounded-xl shadow-sm p-4 flex gap-3">
+                    {#if reply.author.pfp}
+                      <img
+                        src={reply.author.pfp}
+                        alt={reply.author.nama}
+                        class="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"
+                      />
+                    {:else}
+                      <div class="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center shrink-0">
+                        <span class="text-xs font-bold text-white">{reply.author.nama.charAt(0).toUpperCase()}</span>
+                      </div>
+                    {/if}
+
+                    <div class="flex-1">
+                      <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                          <p class="text-sm font-bold text-gray-800">{reply.author.nama}</p>
+                          <p class="text-xs text-gray-400">{timeAgo(reply.createdAt)}</p>
+                        </div>
+
+                        <!-- TOMBOL EDIT & HAPUS REPLY -->
+                        {#if reply.author.nama === currentUserName}
+                          <div class="flex items-center gap-1">
+                            <button
+                              type="button"
+                              on:click={() => editReplyThread(reply)}
+                              class="p-1 text-gray-400 hover:text-[#0a4682] hover:bg-blue-50 rounded transition-colors"
+                              title="Edit"
+                            >
+                              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 7.125L16.875 4.5M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              on:click={() => deleteReplyThread(reply)}
+                              class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Hapus"
+                            >
+                              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 7h12M9 7V4h6v3m-8 0l1 13h6l1-13M10 11v5m4-5v5" />
+                              </svg>
+                            </button>
+                          </div>
+                        {/if}
+                      </div>
+
+                      <p class="text-sm text-gray-600 mt-1">{reply.content}</p>
+
+                      <!-- Like Button untuk Reply -->
+                      <button
+                        on:click={() => toggleReplyLike(reply)}
+                        class="flex items-center gap-1 mt-2 text-xs font-medium transition-colors {reply.likedByMe ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}"
+                      >
+                        <svg
+                          class="w-3.5 h-3.5"
+                          fill={reply.likedByMe ? "currentColor" : "none"}
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <path
                             stroke-linecap="round"
                             stroke-linejoin="round"
                             d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                        />
-                    </svg>
-                    <span>{reply.likeCount || 0}</span>
-                </button>
-            </div>
-        </div>
-    {:else}
-        <p class="text-sm text-gray-400 text-center py-8">
-            Belum ada balasan, jadi yang pertama!
-        </p>
-    {/each}
+                          />
+                        </svg>
+                        <span>{reply.likeCount || 0}</span>
+                      </button>
+                    </div>
+                  </div>
+                {:else}
+                  <p class="text-sm text-gray-400 text-center py-8">
+                    Belum ada balasan, jadi yang pertama!
+                  </p>
+                {/each}
 
-    {#if isLoadingMoreReplies}
-      <div class="flex justify-center py-4">
-        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-[#0a4682]"></div>
-      </div>
-    {:else if !hasMoreReplies && activeThread.replies.length > 0}
-      <p class="text-center text-xs text-gray-300 py-4">
-        Semua balasan udah kemuat 👀
-      </p>
-    {/if}
-</div>
+                {#if isLoadingMoreReplies}
+                  <div class="flex justify-center py-4">
+                    <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-[#0a4682]"></div>
+                  </div>
+                {:else if !hasMoreReplies && activeThread.replies.length > 0}
+                  <p class="text-center text-xs text-gray-300 py-4">
+                    Semua balasan udah kemuat 👀
+                  </p>
+                {/if}
+              </div>
 
               <!-- Reply box -->
               <div
